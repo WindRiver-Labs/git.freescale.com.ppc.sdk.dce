@@ -39,7 +39,7 @@
 
 /* FCR: Flow Context Record */
 struct fcr {
-	uint32_t dont_manipulate_directly[32];
+	u32 dont_manipulate_directly[32];
 };
 
 /*******************************************************************************
@@ -50,26 +50,26 @@ struct fcr {
 void fcr_clear(struct fcr *d);
 
 /* Storage Profile Format and Data Placement Controls */
-uint32_t fcr_get_ffdpc_hi(struct fcr *d);
-uint32_t fcr_get_ffdpc_lo(struct fcr *d);
+u32 fcr_get_ffdpc_hi(struct fcr *d);
+u32 fcr_get_ffdpc_lo(struct fcr *d);
 
 /* BP2 settings: buffer pool id, pool buffer size */
-uint32_t fcr_get_bp2ac(struct fcr *d);
+u32 fcr_get_bp2ac(struct fcr *d);
 void fcr_set_bp2ac_bmt(struct fcr *d, int enable);
 int fcr_get_bp2ac_bmt(struct fcr *d);
-void fcr_set_bp2ac_bpid(struct fcr *d, uint32_t bpid);
-uint32_t fcr_get_bp2ac_bpid(struct fcr *d);
-void fcr_set_bp2ac_pbs(struct fcr *d, uint32_t pbs);
-uint32_t fcr_get_bp2ac_pbs(struct fcr *d);
+void fcr_set_bp2ac_bpid(struct fcr *d, u32 bpid);
+u32 fcr_get_bp2ac_bpid(struct fcr *d);
+void fcr_set_bp2ac_pbs(struct fcr *d, u32 pbs);
+u32 fcr_get_bp2ac_pbs(struct fcr *d);
 
 /* BP1 settings: buffer pool id, pool buffer size */
-uint32_t fcr_get_bp1ac(struct fcr *d);
+u32 fcr_get_bp1ac(struct fcr *d);
 void fcr_set_bp1ac_bmt(struct fcr *d, int enable);
 int fcr_get_bp1ac_bmt(struct fcr *d);
-void fcr_set_bp1ac_bpid(struct fcr *d, uint32_t bpid);
-uint32_t fcr_get_bp1ac_bpid(struct fcr *d);
-void fcr_set_bp1ac_pbs(struct fcr *d, uint32_t pbs);
-uint32_t fcr_get_bp1ac_pbs(struct fcr *d);
+void fcr_set_bp1ac_bpid(struct fcr *d, u32 bpid);
+u32 fcr_get_bp1ac_bpid(struct fcr *d);
+void fcr_set_bp1ac_pbs(struct fcr *d, u32 pbs);
+u32 fcr_get_bp1ac_pbs(struct fcr *d);
 
 /* next_flc */
 void fcr_set_next_flc(struct fcr *d, uint64_t addr);

@@ -29,17 +29,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include "compat.h"
-#include "fsl_qbman_base.h"
 #include "dce-scf-compression.h"
 #include "dce-scf-decompression.h"
 #include "dce.h"
-
 /* #define debug */
+
+MODULE_AUTHOR("Freescale Semicondictor, Inc");
+MODULE_DESCRIPTION("DCE API");
+MODULE_LICENSE("Dual BSD/GPL");
 
 /* dma memories that need to be allocated
  *	memory		size			alignment_req
@@ -62,7 +59,7 @@
 struct work_unit {
 	union store {
 		/* faster if aligned */
-		struct qbman_fd fd_list_store[3] __attribute__((aligned(64)));
+		struct qbman_fd fd_list_store[3] __aligned(64);
 		struct {
 			struct qbman_fd output_fd;
 			struct qbman_fd input_fd;
@@ -70,8 +67,7 @@ struct work_unit {
 			void *context;
 		};
 	} store;
-	/* must 64 byte align */
-	struct scf_c_cfg scf_result __attribute__((aligned(64)));
+	struct scf_c_cfg scf_result __aligned(64); /* must 64 byte align */
 	struct qbman_fd fd_list;
 };
 
@@ -132,7 +128,7 @@ static void trigger_user_callback(struct dce_session *session,
  *
  * This simple callback does simple checking the calls a function to trigger the
  * user callback if all checks were passed */
-static void internal_callback(struct dce_flow *flow, uint32_t cmd,
+static void internal_callback(struct dce_flow *flow, u32 cmd,
 			    const struct qbman_fd *fd)
 {
 	struct dce_session *session = container_of(flow,
@@ -141,12 +137,12 @@ static void internal_callback(struct dce_flow *flow, uint32_t cmd,
 	switch ((enum dce_cmd)cmd) {
 	case DCE_CMD_NOP:
 		pr_info("Received unexpected NOP response in DCE API\n");
-		assert(0); /* it is unexpected that the DCE API will send
+		assert(false); /* it is unexpected that the DCE API will send
 				* a NOP command, so we should never be here */
 		break;
 	case DCE_CMD_CTX_INVALIDATE:
 		pr_info("Received unexpected context invalidate in DCE API\n");
-		assert(0); /* we should never be here */
+		assert(false); /* we should never be here */
 		break;
 	case DCE_CMD_PROCESS:
 #ifdef debug
@@ -223,6 +219,7 @@ static int alloc_dce_internals(struct dce_session *session)
 int dce_session_create(struct dce_session *session,
 		       struct dce_session_params *params)
 {
+	struct dpdcei_priv *device;
 	/* We do not create the session struct here to allow our user to nest
 	 * the session struct in their own structures and recover the container
 	 * of the session using container_of() */
@@ -236,16 +233,16 @@ int dce_session_create(struct dce_session *session,
 
 	/* get (de)compression device */
 	if (params->engine == DCE_COMPRESSION)
-		session->device = get_compression_device();
+		device = get_compression_device();
 	else if (params->engine == DCE_DECOMPRESSION)
-		session->device = get_decompression_device();
+		device = get_decompression_device();
 	else
 		return -EINVAL;
 
-	if (!session->device)
+	if (!device)
 		return -EBUSY;
 
-	ret = dce_flow_create(session->device, &session->flow);
+	ret = dce_flow_create(device, &session->flow);
 	if (ret)
 		return -EBUSY;
 	/* No need to configure the flow context record, because the first frame
@@ -280,28 +277,25 @@ fail_dce_internals:
 	dce_flow_destroy(&session->flow);
 	return ret;
 }
-
-struct fsl_mc_device *dce_session_device(struct dce_session *session)
-{
-	return session->device;
-}
+EXPORT_SYMBOL(dce_session_create);
 
 int dce_session_destroy(struct dce_session *session)
 {
 	/* Attempt to destroy the session while frames in flight */
-	if (atomic_load(&session->flow.frames_in_flight))
+	if (atomic_read(&session->flow.frames_in_flight))
 		return -EACCES;
 	free_dce_internals(session);
 	dce_flow_destroy(&session->flow);
 	return 0;
 }
+EXPORT_SYMBOL(dce_session_destroy);
 
 int dce_process_frame(struct dce_session *session,
 		      struct qbman_fd *input_fd,
 		      struct qbman_fd *output_fd,
 		      enum dce_flush_parameter flush,
-		      int initial_frame,
-		      int recycled_frame,
+		      bool initial_frame,
+		      bool recycled_frame,
 		      void *context)
 {
 	struct dce_flow *flow = &session->flow;
@@ -344,10 +338,10 @@ int dce_process_frame(struct dce_session *session,
 	 * Doing it every time for now. pmode 1 = truncate, 0 = recycle */
 	if (session->paradigm == DCE_SESSION_STATEFUL_RECYCLE)
 		scf_c_cfg_set_pmode((struct scf_c_cfg *)&work_unit->scf_result,
-				0);
+				false);
 	else
 		scf_c_cfg_set_pmode((struct scf_c_cfg *)&work_unit->scf_result,
-				1);
+				true);
 
 	/* FD */
 	qbman_fd_set_len(fd_list, qbman_fd_get_len(input_fd));
@@ -355,7 +349,7 @@ int dce_process_frame(struct dce_session *session,
 	qbman_fd_set_addr(fd_list, (dma_addr_t)work_unit->store.fd_list_store);
 	fd_frc_set_ce((struct fd_attr *)fd_list, session->compression_effort);
 	/* hardware bug requires the SCR flush to occur every time */
-	fd_frc_set_scrf((struct fd_attr *)fd_list, 1);
+	fd_frc_set_scrf((struct fd_attr *)fd_list, true);
 	fd_frc_set_sf((struct fd_attr *)fd_list, !!session->paradigm);
 	fd_frc_set_cf((struct fd_attr *)fd_list, (enum dce_comp_fmt)
 			session->compression_format);
@@ -364,9 +358,9 @@ int dce_process_frame(struct dce_session *session,
 	fd_frc_set_z_flush((struct fd_attr *)fd_list, flush);
 	if (initial_frame) {
 		/* FIXME: CM and FLG should be setup differently for GZIP */
-		uint8_t CM, FLG;
-		fd_frc_set_uspc((struct fd_attr *)fd_list, 1);
-		fd_frc_set_uhc((struct fd_attr *)fd_list, 1);
+		u8 CM, FLG;
+		fd_frc_set_uspc((struct fd_attr *)fd_list, true);
+		fd_frc_set_uhc((struct fd_attr *)fd_list, true);
 
 		CM = 0x48; /* 8 means Deflate and 4 means a 4 KB compression
 			      window these are the only values allowed in DCE */
@@ -403,8 +397,8 @@ int dce_process_frame(struct dce_session *session,
 			goto fail;
 		}
 	} else {
-		fd_frc_set_uspc((struct fd_attr *)fd_list, 0);
-		fd_frc_set_uhc((struct fd_attr *)fd_list, 0);
+		fd_frc_set_uspc((struct fd_attr *)fd_list, false);
+		fd_frc_set_uhc((struct fd_attr *)fd_list, false);
 	}
 
 	/* Set caller context */
@@ -431,6 +425,7 @@ int dce_process_frame(struct dce_session *session,
 fail:
 	return ret;
 }
+EXPORT_SYMBOL(dce_process_frame);
 
 #define EMPTY_DPAA_FD {.words = {0, 0, 0, 0, 0, 0, 0, 0} }
 
@@ -440,8 +435,8 @@ int dce_process_data(struct dce_session *session,
 		     size_t input_len,
 		     size_t output_len,
 		     enum dce_flush_parameter flush,
-		     int initial_frame,
-		     int recycled_frame,
+		     bool initial_frame,
+		     bool recycled_frame,
 		     void *context)
 {
 	struct qbman_fd input_fd = EMPTY_DPAA_FD,
@@ -458,4 +453,5 @@ int dce_process_data(struct dce_session *session,
 	return dce_process_frame(session, &input_fd, &output_fd, flush,
 				 initial_frame, recycled_frame, context);
 }
+EXPORT_SYMBOL(dce_process_data);
 

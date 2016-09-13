@@ -45,7 +45,7 @@
  * that crosses a word boundary too (64-bit fields are the obvious examples).
  */
 struct dce_attr_code {
-	unsigned int word; /* which uint32_t[] array member encodes the field */
+	unsigned int word; /* which u32[] array member encodes the field */
 	unsigned int lsoffset; /* encoding offset from ls-bit */
 	unsigned int width; /* encoding width. (bool must be 1.) */
 };
@@ -56,10 +56,10 @@ struct dce_attr_code {
 	DCE_CODE((unsigned int)-1, (unsigned int)-1, (unsigned int)-1)
 
 /* decode a field from a cacheline */
-static inline uint32_t dce_attr_code_decode(const struct dce_attr_code *code,
-				      const uint32_t *cacheline)
+static inline u32 dce_attr_code_decode(const struct dce_attr_code *code,
+				      const u32 *cacheline)
 {
-	return d32_uint32_t(code->lsoffset, code->width, cacheline[code->word]);
+	return d32_u32(code->lsoffset, code->width, cacheline[code->word]);
 }
 static inline uint64_t dce_attr_code_decode_64(const struct dce_attr_code *code,
 				      const uint64_t *cacheline)
@@ -69,11 +69,11 @@ static inline uint64_t dce_attr_code_decode_64(const struct dce_attr_code *code,
 
 /* encode a field to a cacheline */
 static inline void dce_attr_code_encode(const struct dce_attr_code *code,
-				       uint32_t *cacheline, uint32_t val)
+				       u32 *cacheline, u32 val)
 {
 	cacheline[code->word] =
-		r32_uint32_t(code->lsoffset, code->width, cacheline[code->word])
-		| e32_uint32_t(code->lsoffset, code->width, val);
+		r32_u32(code->lsoffset, code->width, cacheline[code->word])
+		| e32_u32(code->lsoffset, code->width, val);
 }
 static inline void dce_attr_code_encode_64(const struct dce_attr_code *code,
 				       uint64_t *cacheline, uint64_t val)
@@ -86,15 +86,15 @@ static inline void dce_attr_code_encode_64(const struct dce_attr_code *code,
  * +127, a setting of -7 would appear to decode to the 32-bit unsigned value
  * 249. Likewise -120 would decode as 136.) This function allows the caller to
  * "re-sign" such fields to 32-bit signed. (Eg. -7, which was 249 with an 8-bit
- * encoding, will become 0xfffffff9 if you cast the return value to uint32_t).
+ * encoding, will become 0xfffffff9 if you cast the return value to u32).
  */
 static inline int32_t dce_attr_code_makesigned(const struct dce_attr_code *code,
-					  uint32_t val)
+					  u32 val)
 {
 	BUG_ON(val >= (1u << code->width));
 	/* If the high bit was set, it was encoding a negative */
 	if (val >= (1u << (code->width - 1)))
-		return (int32_t)0 - (int32_t)(((uint32_t)1 << code->width) -
+		return (int32_t)0 - (int32_t)(((u32)1 << code->width) -
 			val);
 	/* Otherwise, it was encoding a positive */
 	return (int32_t)val;

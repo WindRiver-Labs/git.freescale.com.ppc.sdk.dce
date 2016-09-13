@@ -32,45 +32,44 @@
 #ifndef __DCE_FD_H
 #define __DCE_FD_H
 
-#include "dce-fd.h"
 #include <linux/types.h>
 
 
 struct fd_attr {
-	uint32_t dont_manipulate_directly[8];
+	u32 dont_manipulate_directly[8];
 };
 
 struct fle_attr {
-	uint32_t dont_manipulate_directly[8];
+	u32 dont_manipulate_directly[8];
 };
 
 /* Frame Descriptor */
 uint64_t fd_attr_get_addr_64(struct fd_attr *d);
-void fd_attr_get_addr_49(struct fd_attr *d, uint32_t *hi, uint32_t *lo);
-void fd_attr_get_addr_64_v2(struct fd_attr *d, uint32_t *hi, uint32_t *lo);
-uint32_t fd_attr_get_sw_token(struct fd_attr *d);
+void fd_attr_get_addr_49(struct fd_attr *d, u32 *hi, u32 *lo);
+void fd_attr_get_addr_64_v2(struct fd_attr *d, u32 *hi, u32 *lo);
+u32 fd_attr_get_sw_token(struct fd_attr *d);
 
-uint32_t fd_attr_get_data_len_18(struct fd_attr *d);
-uint32_t fd_attr_get_data_len_32(struct fd_attr *d);
-uint32_t fd_attr_get_mem(struct fd_attr *d);
-uint32_t fd_attr_get_bpid(struct fd_attr *d);
-uint32_t fd_attr_get_ivp(struct fd_attr *d);
-uint32_t fd_attr_get_bmt(struct fd_attr *d);
-uint32_t fd_attr_get_offset(struct fd_attr *d);
-uint32_t fd_attr_get_frame_format(struct fd_attr *d);
-uint32_t fd_attr_get_sl(struct fd_attr *d);
-uint32_t fd_attr_get_frc(const struct fd_attr *d);
-uint32_t fd_attr_get_frc_status(const struct fd_attr *d);
-uint32_t fd_attr_get_err(struct fd_attr *d);
-uint32_t fd_attr_get_va(struct fd_attr *d);
-uint32_t fd_attr_get_cbmt(struct fd_attr *d);
-uint32_t fd_attr_get_asal(struct fd_attr *d);
-uint32_t fd_attr_get_ptv2(struct fd_attr *d);
-uint32_t fd_attr_get_ptv1(struct fd_attr *d);
-uint32_t fd_attr_get_pta(struct fd_attr *d);
-uint32_t fd_attr_get_dropp(struct fd_attr *d);
-uint32_t fd_attr_get_sc(struct fd_attr *d);
-uint32_t fd_attr_get_dd(struct fd_attr *d);
+u32 fd_attr_get_data_len_18(struct fd_attr *d);
+u32 fd_attr_get_data_len_32(struct fd_attr *d);
+u32 fd_attr_get_mem(struct fd_attr *d);
+u32 fd_attr_get_bpid(struct fd_attr *d);
+u32 fd_attr_get_ivp(struct fd_attr *d);
+u32 fd_attr_get_bmt(struct fd_attr *d);
+u32 fd_attr_get_offset(struct fd_attr *d);
+u32 fd_attr_get_frame_format(struct fd_attr *d);
+u32 fd_attr_get_sl(struct fd_attr *d);
+u32 fd_attr_get_frc(const struct fd_attr *d);
+u32 fd_attr_get_frc_status(const struct fd_attr *d);
+u32 fd_attr_get_err(struct fd_attr *d);
+u32 fd_attr_get_va(struct fd_attr *d);
+u32 fd_attr_get_cbmt(struct fd_attr *d);
+u32 fd_attr_get_asal(struct fd_attr *d);
+u32 fd_attr_get_ptv2(struct fd_attr *d);
+u32 fd_attr_get_ptv1(struct fd_attr *d);
+u32 fd_attr_get_pta(struct fd_attr *d);
+u32 fd_attr_get_dropp(struct fd_attr *d);
+u32 fd_attr_get_sc(struct fd_attr *d);
+u32 fd_attr_get_dd(struct fd_attr *d);
 void pretty_print_fd(struct fd_attr *d);
 
 /* set methods */
@@ -80,32 +79,32 @@ uint64_t fd_attr_get_flc_64(struct fd_attr *d);
 
 /*  Frame list entry (FLE) */
 uint64_t fle_attr_get_addr_64(struct fle_attr *d);
-void fle_attr_get_addr_49(struct fle_attr *d,  uint32_t *hi, uint32_t *lo);
-void fle_attr_get_addr_64_v2(struct fle_attr *d,  uint32_t *hi, uint32_t *lo);
-uint32_t fle_attr_get_sw_token(struct fle_attr *d);
-uint32_t fle_attr_get_data_len_18(struct fle_attr *d);
-uint32_t fle_attr_get_data_len_32(struct fle_attr *d);
-uint32_t fle_attr_get_mem(struct fle_attr *d);
-uint32_t fle_attr_get_bpid(struct fle_attr *d);
-uint32_t fle_attr_get_ivp(struct fle_attr *d);
-uint32_t fle_attr_get_bmt(struct fle_attr *d);
-uint32_t fle_attr_get_offset(struct fle_attr *d);
-uint32_t fle_attr_get_frame_format(struct fle_attr *d);
-uint32_t fle_attr_get_sl(struct fle_attr *d);
-uint32_t fle_attr_get_final(struct fle_attr *d);
-uint32_t fle_attr_get_frc(struct fle_attr *d);
-uint32_t fle_attr_get_err(struct fle_attr *d);
-uint32_t fle_attr_get_fd_compat_1(struct fle_attr *d);
-uint32_t fle_attr_get_cbmt(struct fle_attr *d);
-uint32_t fle_attr_get_asal(struct fle_attr *d);
-uint32_t fle_attr_get_ptv2(struct fle_attr *d);
-uint32_t fle_attr_get_ptv1(struct fle_attr *d);
-uint32_t fle_attr_get_pta(struct fle_attr *d);
-uint32_t fle_attr_get_fd_compat_8(struct fle_attr *d);
+void fle_attr_get_addr_49(struct fle_attr *d,  u32 *hi, u32 *lo);
+void fle_attr_get_addr_64_v2(struct fle_attr *d,  u32 *hi, u32 *lo);
+u32 fle_attr_get_sw_token(struct fle_attr *d);
+u32 fle_attr_get_data_len_18(struct fle_attr *d);
+u32 fle_attr_get_data_len_32(struct fle_attr *d);
+u32 fle_attr_get_mem(struct fle_attr *d);
+u32 fle_attr_get_bpid(struct fle_attr *d);
+u32 fle_attr_get_ivp(struct fle_attr *d);
+u32 fle_attr_get_bmt(struct fle_attr *d);
+u32 fle_attr_get_offset(struct fle_attr *d);
+u32 fle_attr_get_frame_format(struct fle_attr *d);
+u32 fle_attr_get_sl(struct fle_attr *d);
+u32 fle_attr_get_final(struct fle_attr *d);
+u32 fle_attr_get_frc(struct fle_attr *d);
+u32 fle_attr_get_err(struct fle_attr *d);
+u32 fle_attr_get_fd_compat_1(struct fle_attr *d);
+u32 fle_attr_get_cbmt(struct fle_attr *d);
+u32 fle_attr_get_asal(struct fle_attr *d);
+u32 fle_attr_get_ptv2(struct fle_attr *d);
+u32 fle_attr_get_ptv1(struct fle_attr *d);
+u32 fle_attr_get_pta(struct fle_attr *d);
+u32 fle_attr_get_fd_compat_8(struct fle_attr *d);
 
 void fle_attr_set_flc_64(struct fle_attr *d, uint64_t addr);
 uint64_t fle_attr_get_flc_64(struct fle_attr *d);
-void fle_attr_get_flc_64_v2(struct fle_attr *d,  uint32_t *hi, uint32_t *lo);
+void fle_attr_get_flc_64_v2(struct fle_attr *d,  u32 *hi, u32 *lo);
 
 void pretty_print_fle(struct fle_attr *d);
 void pretty_print_fle_n(struct fle_attr *d, int n);

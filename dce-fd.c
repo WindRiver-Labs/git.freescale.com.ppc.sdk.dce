@@ -92,7 +92,7 @@ static struct dce_attr_code code_fle_flc_hi = DCE_CODE(7, 0, 32);
 
 uint64_t fd_attr_get_addr_64(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return ((uint64_t)dce_attr_code_decode(&code_fd_addr_hi_32,
 			p) << 32) |
@@ -101,203 +101,203 @@ uint64_t fd_attr_get_addr_64(struct fd_attr *d)
 }
 EXPORT_SYMBOL(fd_attr_get_addr_64);
 
-void fd_attr_get_addr_49(struct fd_attr *d, uint32_t *hi, uint32_t *lo)
+void fd_attr_get_addr_49(struct fd_attr *d, u32 *hi, u32 *lo)
 {
-	uint32_t *p = ATTR32(d);
+	u32 *p = ATTR32(d);
 
 	*hi = dce_attr_code_decode(&code_fd_addr_hi_17, p);
 	*lo = dce_attr_code_decode(&code_fd_addr_lo, p);
 }
 EXPORT_SYMBOL(fd_attr_get_addr_49);
 
-void fd_attr_get_addr_64_v2(struct fd_attr *d, uint32_t *hi, uint32_t *lo)
+void fd_attr_get_addr_64_v2(struct fd_attr *d, u32 *hi, u32 *lo)
 {
-	uint32_t *p = ATTR32(d);
+	u32 *p = ATTR32(d);
 
 	*hi = dce_attr_code_decode(&code_fd_addr_hi_32, p);
 	*lo = dce_attr_code_decode(&code_fd_addr_lo, p);
 }
 EXPORT_SYMBOL(fd_attr_get_addr_64_v2);
 
-uint32_t fd_attr_get_sw_token(struct fd_attr *d)
+u32 fd_attr_get_sw_token(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_sw_token, p);
 }
 EXPORT_SYMBOL(fd_attr_get_sw_token);
 
-uint32_t fd_attr_get_data_len_18(struct fd_attr *d)
+u32 fd_attr_get_data_len_18(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_data_len_18, p);
 }
 EXPORT_SYMBOL(fd_attr_get_data_len_18);
 
-uint32_t fd_attr_get_data_len_32(struct fd_attr *d)
+u32 fd_attr_get_data_len_32(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_data_len_32, p);
 }
 EXPORT_SYMBOL(fd_attr_get_data_len_32);
 
-uint32_t fd_attr_get_mem(struct fd_attr *d)
+u32 fd_attr_get_mem(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_mem, p);
 }
 EXPORT_SYMBOL(fd_attr_get_mem);
 
-uint32_t fd_attr_get_bpid(struct fd_attr *d)
+u32 fd_attr_get_bpid(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_bpid, p);
 }
 EXPORT_SYMBOL(fd_attr_get_bpid);
 
-uint32_t fd_attr_get_ivp(struct fd_attr *d)
+u32 fd_attr_get_ivp(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_ivp, p);
 }
 EXPORT_SYMBOL(fd_attr_get_ivp);
 
-uint32_t fd_attr_get_bmt(struct fd_attr *d)
+u32 fd_attr_get_bmt(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_bmt, p);
 }
 EXPORT_SYMBOL(fd_attr_get_bmt);
 
-uint32_t fd_attr_get_offset(struct fd_attr *d)
+u32 fd_attr_get_offset(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_offset, p);
 }
 EXPORT_SYMBOL(fd_attr_get_offset);
 
-uint32_t fd_attr_get_frame_format(struct fd_attr *d)
+u32 fd_attr_get_frame_format(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_format, p);
 }
 EXPORT_SYMBOL(fd_attr_get_frame_format);
 
-uint32_t fd_attr_get_sl(struct fd_attr *d)
+u32 fd_attr_get_sl(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_sl, p);
 }
 EXPORT_SYMBOL(fd_attr_get_sl);
 
-uint32_t fd_attr_get_frc(const struct fd_attr *d)
+u32 fd_attr_get_frc(const struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_frc, p);
 }
 EXPORT_SYMBOL(fd_attr_get_frc);
 
-uint32_t fd_attr_get_frc_status(const struct fd_attr *d)
+u32 fd_attr_get_frc_status(const struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_frc_status, p);
 }
 EXPORT_SYMBOL(fd_attr_get_frc_status);
 
-uint32_t fd_attr_get_err(struct fd_attr *d)
+u32 fd_attr_get_err(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_err, p);
 }
 EXPORT_SYMBOL(fd_attr_get_err);
 
-uint32_t fd_attr_get_va(struct fd_attr *d)
+u32 fd_attr_get_va(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_va, p);
 }
 EXPORT_SYMBOL(fd_attr_get_va);
 
-uint32_t fd_attr_get_cbmt(struct fd_attr *d)
+u32 fd_attr_get_cbmt(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_cbmt, p);
 }
 EXPORT_SYMBOL(fd_attr_get_cbmt);
 
-uint32_t fd_attr_get_asal(struct fd_attr *d)
+u32 fd_attr_get_asal(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_asal, p);
 }
 EXPORT_SYMBOL(fd_attr_get_asal);
 
-uint32_t fd_attr_get_ptv2(struct fd_attr *d)
+u32 fd_attr_get_ptv2(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_ptv2, p);
 }
 EXPORT_SYMBOL(fd_attr_get_ptv2);
 
-uint32_t fd_attr_get_ptv1(struct fd_attr *d)
+u32 fd_attr_get_ptv1(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_ptv1, p);
 }
 EXPORT_SYMBOL(fd_attr_get_ptv1);
 
-uint32_t fd_attr_get_pta(struct fd_attr *d)
+u32 fd_attr_get_pta(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_pta, p);
 }
 EXPORT_SYMBOL(fd_attr_get_pta);
 
-uint32_t fd_attr_get_dropp(struct fd_attr *d)
+u32 fd_attr_get_dropp(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_dropp, p);
 }
 EXPORT_SYMBOL(fd_attr_get_dropp);
 
-uint32_t fd_attr_get_sc(struct fd_attr *d)
+u32 fd_attr_get_sc(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_sc, p);
 }
 EXPORT_SYMBOL(fd_attr_get_sc);
 
-uint32_t fd_attr_get_dd(struct fd_attr *d)
+u32 fd_attr_get_dd(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fd_dd, p);
 }
 EXPORT_SYMBOL(fd_attr_get_dd);
 
-void fd_attr_get_flc_64_v2(struct fd_attr *d, uint32_t *hi, uint32_t *lo)
+void fd_attr_get_flc_64_v2(struct fd_attr *d, u32 *hi, u32 *lo)
 {
-	uint32_t *p = ATTR32(d);
+	u32 *p = ATTR32(d);
 
 	*hi = dce_attr_code_decode(&code_fd_flc_hi, p);
 	*lo = dce_attr_code_decode(&code_fd_flc_lo, p);
@@ -306,7 +306,7 @@ EXPORT_SYMBOL(fd_attr_get_flc_64_v2);
 
 void fd_attr_set_flc_64(struct fd_attr *d, uint64_t addr)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	dce_attr_code_encode_64(&code_fd_flc_lo, (uint64_t *)p, addr);
 }
@@ -314,7 +314,7 @@ EXPORT_SYMBOL(fd_attr_set_flc_64);
 
 uint64_t fd_attr_get_flc_64(struct fd_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return ((uint64_t)dce_attr_code_decode(&code_fd_flc_hi,
 			p) << 32) |
@@ -358,7 +358,7 @@ EXPORT_SYMBOL(pretty_print_fd);
 /* FLE */
 uint64_t fle_attr_get_addr_64(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return ((uint64_t)dce_attr_code_decode(&code_fle_addr_hi_32,
 			p) << 32) |
@@ -367,179 +367,179 @@ uint64_t fle_attr_get_addr_64(struct fle_attr *d)
 }
 EXPORT_SYMBOL(fle_attr_get_addr_64);
 
-uint32_t fle_attr_get_sw_token(struct fle_attr *d)
+u32 fle_attr_get_sw_token(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_sw_token, p);
 }
 EXPORT_SYMBOL(fle_attr_get_sw_token);
 
-void fle_attr_get_addr_49(struct fle_attr *d,  uint32_t *hi, uint32_t *lo)
+void fle_attr_get_addr_49(struct fle_attr *d,  u32 *hi, u32 *lo)
 {
-	uint32_t *p = ATTR32(d);
+	u32 *p = ATTR32(d);
 
 	*hi = dce_attr_code_decode(&code_fle_addr_hi_17, p);
 	*lo = dce_attr_code_decode(&code_fle_addr_lo, p);
 }
 EXPORT_SYMBOL(fle_attr_get_addr_49);
 
-void fle_attr_get_addr_64_v2(struct fle_attr *d,  uint32_t *hi, uint32_t *lo)
+void fle_attr_get_addr_64_v2(struct fle_attr *d,  u32 *hi, u32 *lo)
 {
-	uint32_t *p = ATTR32(d);
+	u32 *p = ATTR32(d);
 
 	*hi = dce_attr_code_decode(&code_fle_addr_hi_32, p);
 	*lo = dce_attr_code_decode(&code_fle_addr_lo, p);
 }
 EXPORT_SYMBOL(fle_attr_get_addr_64_v2);
 
-uint32_t fle_attr_get_data_len_18(struct fle_attr *d)
+u32 fle_attr_get_data_len_18(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_data_len_18, p);
 }
 EXPORT_SYMBOL(fle_attr_get_data_len_18);
 
-uint32_t fle_attr_get_data_len_32(struct fle_attr *d)
+u32 fle_attr_get_data_len_32(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_data_len_32, p);
 }
 EXPORT_SYMBOL(fle_attr_get_data_len_32);
 
-uint32_t fle_attr_get_mem(struct fle_attr *d)
+u32 fle_attr_get_mem(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_mem, p);
 }
 EXPORT_SYMBOL(fle_attr_get_mem);
 
-uint32_t fle_attr_get_bpid(struct fle_attr *d)
+u32 fle_attr_get_bpid(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_bpid, p);
 }
 EXPORT_SYMBOL(fle_attr_get_bpid);
 
-uint32_t fle_attr_get_ivp(struct fle_attr *d)
+u32 fle_attr_get_ivp(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_ivp, p);
 }
 EXPORT_SYMBOL(fle_attr_get_ivp);
 
-uint32_t fle_attr_get_bmt(struct fle_attr *d)
+u32 fle_attr_get_bmt(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_bmt, p);
 }
 EXPORT_SYMBOL(fle_attr_get_bmt);
 
-uint32_t fle_attr_get_offset(struct fle_attr *d)
+u32 fle_attr_get_offset(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_offset, p);
 }
 EXPORT_SYMBOL(fle_attr_get_offset);
 
-uint32_t fle_attr_get_frame_format(struct fle_attr *d)
+u32 fle_attr_get_frame_format(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_format, p);
 }
 EXPORT_SYMBOL(fle_attr_get_frame_format);
 
-uint32_t fle_attr_get_sl(struct fle_attr *d)
+u32 fle_attr_get_sl(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_sl, p);
 }
 EXPORT_SYMBOL(fle_attr_get_sl);
 
-uint32_t fle_attr_get_final(struct fle_attr *d)
+u32 fle_attr_get_final(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_final, p);
 }
 EXPORT_SYMBOL(fle_attr_get_final);
 
-uint32_t fle_attr_get_frc(struct fle_attr *d)
+u32 fle_attr_get_frc(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_frc, p);
 }
 EXPORT_SYMBOL(fle_attr_get_frc);
 
-uint32_t fle_attr_get_err(struct fle_attr *d)
+u32 fle_attr_get_err(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_err, p);
 }
 EXPORT_SYMBOL(fle_attr_get_err);
 
-uint32_t fle_attr_get_fd_compat_1(struct fle_attr *d)
+u32 fle_attr_get_fd_compat_1(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_fd_compat_1, p);
 }
 EXPORT_SYMBOL(fle_attr_get_fd_compat_1);
 
-uint32_t fle_attr_get_cbmt(struct fle_attr *d)
+u32 fle_attr_get_cbmt(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_cbmt, p);
 }
 EXPORT_SYMBOL(fle_attr_get_cbmt);
 
-uint32_t fle_attr_get_asal(struct fle_attr *d)
+u32 fle_attr_get_asal(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_asal, p);
 }
 EXPORT_SYMBOL(fle_attr_get_asal);
 
-uint32_t fle_attr_get_ptv2(struct fle_attr *d)
+u32 fle_attr_get_ptv2(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_ptv2, p);
 }
 EXPORT_SYMBOL(fle_attr_get_ptv2);
 
-uint32_t fle_attr_get_ptv1(struct fle_attr *d)
+u32 fle_attr_get_ptv1(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_ptv1, p);
 }
 EXPORT_SYMBOL(fle_attr_get_ptv1);
 
-uint32_t fle_attr_get_pta(struct fle_attr *d)
+u32 fle_attr_get_pta(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_pta, p);
 }
 EXPORT_SYMBOL(fle_attr_get_pta);
 
-uint32_t fle_attr_get_fd_compat_8(struct fle_attr *d)
+u32 fle_attr_get_fd_compat_8(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return dce_attr_code_decode(&code_fle_fd_compat_8, p);
 }
@@ -547,7 +547,7 @@ EXPORT_SYMBOL(fle_attr_get_fd_compat_8);
 
 void fle_attr_set_flc_64(struct fle_attr *d, uint64_t addr)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	dce_attr_code_encode_64(&code_fle_flc_lo, (uint64_t *)p, addr);
 }
@@ -555,7 +555,7 @@ EXPORT_SYMBOL(fle_attr_set_flc_64);
 
 uint64_t fle_attr_get_flc_64(struct fle_attr *d)
 {
-	const uint32_t *p = ATTR32(d);
+	const u32 *p = ATTR32(d);
 
 	return ((uint64_t)dce_attr_code_decode(&code_fle_flc_hi,
 			p) << 32) |

@@ -31,16 +31,26 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/miscdevice.h>
-#include <linux/uaccess.h>
+#include <semaphore.h>
+#include <compat.h>
 #include "dce.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <assert.h>
+#include <getopt.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <pthread.h>
+#include "basic_dce.h"
 
 struct dma_item {
 	void *vaddr;
 	struct dpaa2_fd fd;
-	dma_addr_t paddr;
 	size_t size;
 };
 
@@ -56,8 +66,22 @@ struct work_unit {
 	uint8_t status;
 	size_t output_produced;
 	volatile int done;
-	wait_queue_head_t reply_wait;
+	struct dce_session *session;
+	dma_addr_t input;
+	dma_addr_t output;
+	size_t input_consumed;
+	sem_t reply_wait;
 };
+
+static struct dce_session comp_session;
+static struct dce_session decomp_session;
+
+/* Track number of users of this driver and do not delete info prematurely */
+static atomic_t users;
+
+static volatile int dce = -1;
+
+#define wake_up(x) sem_post(x)
 
 static void dce_callback(struct dce_session *session,
 			uint8_t status,
@@ -69,21 +93,19 @@ static void dce_callback(struct dce_session *session,
 {
 	struct work_unit *work_unit = context;
 
-	work_unit->done = true;
+	work_unit->input = input;
+	work_unit->output = output;
+	work_unit->input_consumed = input_consumed;
+	work_unit->session = session;
 	work_unit->status = status;
 	work_unit->output_produced = output_produced;
+	work_unit->done = true;
 	wake_up(&work_unit->reply_wait);
 }
 
-static struct dce_session comp_session;
-static struct dce_session decomp_session;
-
-/* Track number of users of this driver and do not delete info prematurely */
-static atomic_t users;
-
-static int fsl_dce_dev_open(struct inode *inode, struct file *filep)
+static int setup_dce(void)
 {
-	struct dce_session_params params = {
+		struct dce_session_params params = {
 		.engine = DCE_COMPRESSION,
 		.paradigm = DCE_SESSION_STATELESS,
 		.compression_format = DCE_SESSION_CF_ZLIB,
@@ -118,12 +140,9 @@ static int fsl_dce_dev_open(struct inode *inode, struct file *filep)
 	return 0;
 }
 
-static int fsl_dce_dev_release(struct inode *inode, struct file *filep)
+static int cleanup_dce(void)
 {
 	int ret;
-
-	if (!atomic_dec_and_test(&users))
-		return 0;
 
 	ret = dce_session_destroy(&comp_session);
 	if (ret)
@@ -134,92 +153,74 @@ static int fsl_dce_dev_release(struct inode *inode, struct file *filep)
 	return 0;
 }
 
-static long fsl_dce_dev_ioctl(struct file *filep,
-			unsigned int cmd,
-			unsigned long arg)
+
+
+#define wait_event(x, c) \
+do { \
+	sem_wait(x); \
+	assert(c); \
+} while(0)
+
+int bdce_process_data(enum dce_engine dce_mode,
+		dma_addr_t input,
+		dma_addr_t output,
+		size_t input_len,
+		size_t output_len,
+		size_t *output_produced)
 {
-	struct dce_ioctl_process param;
 	struct work_unit work_unit;
-	struct dma_item input;
-	struct dma_item output;
-	struct fsl_mc_device *device;
 	struct dce_session *session;
 	int ret = -ENOMEM, busy_count = 0;
 	unsigned long timeout;
 
-	ret = copy_from_user(&param, (void __user *)arg, sizeof(param));
-	if (ret) {
-		pr_err("Copy from user failed in DCE driver\n");
-		return -EIO;
+	if (dce < 0) {
+		/* no one initialized the dce yet. Attempt initialize */
+		ret = setup_dce();
+		if (ret < 0) {
+			/* maybe a different pthread already opened it. Take a
+			 * pause and check again */
+			/* ret = pthread_yield(); */
+			printf("attempt to open dce returned errno code %d\n",
+					ret);
+			if (dce < 0)
+				/* no one was able to open the dce */
+				return -ret;
+		} else {
+			dce = ret;
+		}
 	}
 
-	/* return ENOMEM if attetmpt is made to allocate more than allowed */
-	if (param.input_len > KMALLOC_MAX_SIZE) {
-		pr_err("Input size requested, %zu, is too large\n",
-				param.input_len);
-		return -ENOMEM;
-	}
-
-	input.vaddr = kmalloc(param.input_len, GFP_KERNEL);
-	if (!input.vaddr)
-		goto err_alloc_in_data;
-	input.size = param.input_len;
-	ret = copy_from_user(input.vaddr, (void __user *)param.input,
-					input.size);
-	if (ret) {
-		ret = -EIO;
-		pr_err("Copy from user failed in DCE driver\n");
-		goto err_alloc_out_data;
-	}
-
-	if (param.output_len > KMALLOC_MAX_SIZE) {
-		ret = -ENOMEM;
-		pr_err("Output size requested, %zu, is too large\n",
-				param.output_len);
-		goto err_alloc_out_data;
-	}
-	output.vaddr = kzalloc(param.output_len, GFP_KERNEL);
-	if (!output.vaddr) {
-		ret = -ENOMEM;
-		pr_err("Unable to allocate mem in dce driver\n");
-		goto err_alloc_out_data;
-	}
-	output.size = param.output_len;
-
-	session = param.dce_mode == DCE_COMPRESSION ?
+	session = dce_mode == DCE_COMPRESSION ?
 			&comp_session : &decomp_session;
-	device = dce_session_device(session);
-	input.paddr = dma_map_single(&device->dev,
-		input.vaddr, input.size,
-		DMA_BIDIRECTIONAL);
-	output.paddr = dma_map_single(&device->dev,
-		output.vaddr, output.size,
-		DMA_BIDIRECTIONAL);
 
 try_again:
 	work_unit.done = false;
-	init_waitqueue_head(&work_unit.reply_wait);
+	sem_init(&work_unit.reply_wait, 0, 0);
 	ret = dce_process_data(session,
-		     input.paddr,
-		     output.paddr,
-		     input.size,
-		     output.size,
+		     input,
+		     output,
+		     input_len,
+		     output_len,
 		     DCE_Z_FINISH,
 		     1, /* Initial */
 		     0, /* Recycle */
 		     &work_unit);
 	if (ret == -EBUSY && busy_count++ < 10)
 		goto try_again;
+	if (ret) {
+		pr_err("dce_process_data() return error code %d\n", ret);
+		goto err_enqueue;
+	}
+
+	wait_event(&work_unit.reply_wait, work_unit.done); /* wait callback */
+#if 0
 	timeout = wait_event_timeout(work_unit.reply_wait, work_unit.done,
 				msecs_to_jiffies(3500));
 	if (!timeout) {
 		pr_err("Error, didn't get expected callback\n");
 		goto err_timedout;
 	}
-	dma_unmap_single(&device->dev, input.paddr, input.size,
-				DMA_BIDIRECTIONAL);
-	dma_unmap_single(&device->dev, output.paddr, output.size,
-				DMA_BIDIRECTIONAL);
+#endif
 	if (work_unit.status == OUTPUT_BLOCKED_DISCARD) {
 		pr_err("The output buffer supplied was too small\n");
 		ret = work_unit.status;
@@ -229,61 +230,9 @@ try_again:
 		ret = work_unit.status;
 		goto err_timedout;
 	}
-	ret = copy_to_user((void __user *)param.output, output.vaddr,
-			work_unit.output_produced);
-	if (ret) {
-		ret = -EIO;
-		pr_err("Copy to user failed in DCE driver\n");
-	}
-	param.output_len = work_unit.output_produced;
-	ret = copy_to_user((void __user *)arg, &param, sizeof(param));
-	if (ret) {
-		ret = -EIO;
-		pr_err("Copy to user failed in DCE driver\n");
-	}
+
 err_timedout:
-	kfree(output.vaddr);
-err_alloc_out_data:
-	kfree(input.vaddr);
-err_alloc_in_data:
+	*output_produced = work_unit.output_produced;
+err_enqueue:
 	return ret;
 }
-
-static const struct file_operations fsl_dce_dev_fops = {
-	.owner = THIS_MODULE,
-	.open = fsl_dce_dev_open,
-	.release = fsl_dce_dev_release,
-	.unlocked_ioctl = fsl_dce_dev_ioctl,
-	.compat_ioctl = fsl_dce_dev_ioctl,
-};
-
-static struct miscdevice fsl_dce_dev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "dce",
-	.fops = &fsl_dce_dev_fops
-};
-
-static int __init fsl_dce_dev_init(void)
-{
-	int ret;
-
-	pr_info("%s\n", __func__);
-	ret = misc_register(&fsl_dce_dev);
-	if (ret)
-		pr_err("Could not register DCE device\n");
-	return ret;
-}
-
-module_init(fsl_dce_dev_init);
-
-static void __exit fsl_dce_dev_exit(void)
-{
-	pr_info("%s\n", __func__);
-	misc_deregister(&fsl_dce_dev);
-}
-
-module_exit(fsl_dce_dev_exit);
-
-MODULE_AUTHOR("Freescale Semiconductor Inc.");
-MODULE_DESCRIPTION("Freescale's MC restool driver");
-MODULE_LICENSE("GPL");

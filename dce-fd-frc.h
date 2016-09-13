@@ -136,17 +136,17 @@ enum dce_status {
 void fd_frc_set_cmd(struct fd_attr *d, enum dce_cmd cmd);
 enum dce_cmd fd_frc_get_cmd(struct fd_attr *d);
 
-void fd_frc_set_nop_token(struct fd_attr *d, uint32_t token);
-uint32_t fd_frc_get_nop_token(struct fd_attr *d);
+void fd_frc_set_nop_token(struct fd_attr *d, u32 token);
+u32 fd_frc_get_nop_token(struct fd_attr *d);
 
-void fd_frc_set_icid_scope_token(struct fd_attr *d, uint32_t token);
-uint32_t fd_frc_get_icid_scope_token(struct fd_attr *d);
+void fd_frc_set_icid_scope_token(struct fd_attr *d, u32 token);
+u32 fd_frc_get_icid_scope_token(struct fd_attr *d);
 
-void fd_frc_set_cic_token(struct fd_attr *d, uint32_t token);
-uint32_t fd_frc_get_cic_token(struct fd_attr *d);
+void fd_frc_set_cic_token(struct fd_attr *d, u32 token);
+u32 fd_frc_get_cic_token(struct fd_attr *d);
 
-void fd_frc_set_fqflush_token(struct fd_attr *d, uint32_t token);
-uint32_t fd_frc_get_fqflush_token(struct fd_attr *d);
+void fd_frc_set_fqflush_token(struct fd_attr *d, u32 token);
+u32 fd_frc_get_fqflush_token(struct fd_attr *d);
 
 enum dce_status fd_frc_get_status(struct fd_attr *d);
 

@@ -54,33 +54,33 @@ void fcr_clear(struct fcr *d)
 }
 EXPORT_SYMBOL(fcr_clear);
 
-uint32_t fcr_get_ffdpc_hi(struct fcr *d)
+u32 fcr_get_ffdpc_hi(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_ffdpc_hi, cl);
 }
 EXPORT_SYMBOL(fcr_get_ffdpc_hi);
 
-uint32_t fcr_get_ffdpc_lo(struct fcr *d)
+u32 fcr_get_ffdpc_lo(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_ffdpc_lo, cl);
 }
 EXPORT_SYMBOL(fcr_get_ffdpc_lo);
 
-uint32_t fcr_get_bp2ac(struct fcr *d)
+u32 fcr_get_bp2ac(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp2ac, cl);
 }
 EXPORT_SYMBOL(fcr_get_bp2ac);
 
-uint32_t fcr_get_bp1ac(struct fcr *d)
+u32 fcr_get_bp1ac(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp1ac, cl);
 }
@@ -88,7 +88,7 @@ EXPORT_SYMBOL(fcr_get_bp1ac);
 
 void fcr_set_bp2ac_bmt(struct fcr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_bp2ac_bmt, cl, !!enable);
 }
@@ -96,39 +96,39 @@ EXPORT_SYMBOL(fcr_set_bp2ac_bmt);
 
 int fcr_get_bp2ac_bmt(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp2ac_bmt, cl);
 }
 EXPORT_SYMBOL(fcr_get_bp2ac_bmt);
 
-void fcr_set_bp2ac_bpid(struct fcr *d, uint32_t bpid)
+void fcr_set_bp2ac_bpid(struct fcr *d, u32 bpid)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_bp2ac_bpid, cl, bpid);
 }
 EXPORT_SYMBOL(fcr_set_bp2ac_bpid);
 
-uint32_t fcr_get_bp2ac_bpid(struct fcr *d)
+u32 fcr_get_bp2ac_bpid(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp2ac_bpid, cl);
 }
 EXPORT_SYMBOL(fcr_get_bp2ac_bpid);
 
-void fcr_set_bp2ac_pbs(struct fcr *d, uint32_t pbs)
+void fcr_set_bp2ac_pbs(struct fcr *d, u32 pbs)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_bp2ac_pbs, cl, pbs);
 }
 EXPORT_SYMBOL(fcr_set_bp2ac_pbs);
 
-uint32_t fcr_get_bp2ac_pbs(struct fcr *d)
+u32 fcr_get_bp2ac_pbs(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp2ac_pbs, cl);
 }
@@ -136,7 +136,7 @@ EXPORT_SYMBOL(fcr_get_bp2ac_pbs);
 
 void fcr_set_bp1ac_bmt(struct fcr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_bp1ac_bmt, cl, !!enable);
 }
@@ -144,39 +144,39 @@ EXPORT_SYMBOL(fcr_set_bp1ac_bmt);
 
 int fcr_get_bp1ac_bmt(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp1ac_bmt, cl);
 }
 EXPORT_SYMBOL(fcr_get_bp1ac_bmt);
 
-void fcr_set_bp1ac_bpid(struct fcr *d, uint32_t bpid)
+void fcr_set_bp1ac_bpid(struct fcr *d, u32 bpid)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_bp1ac_bpid, cl, bpid);
 }
 EXPORT_SYMBOL(fcr_set_bp1ac_bpid);
 
-uint32_t fcr_get_bp1ac_bpid(struct fcr *d)
+u32 fcr_get_bp1ac_bpid(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp1ac_bpid, cl);
 }
 EXPORT_SYMBOL(fcr_get_bp1ac_bpid);
 
-void fcr_set_bp1ac_pbs(struct fcr *d, uint32_t pbs)
+void fcr_set_bp1ac_pbs(struct fcr *d, u32 pbs)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_bp1ac_pbs, cl, pbs);
 }
 EXPORT_SYMBOL(fcr_set_bp1ac_pbs);
 
-uint32_t fcr_get_bp1ac_pbs(struct fcr *d)
+u32 fcr_get_bp1ac_pbs(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_bp1ac_pbs, cl);
 }
@@ -184,7 +184,7 @@ EXPORT_SYMBOL(fcr_get_bp1ac_pbs);
 
 void fcr_set_next_flc(struct fcr *d, uint64_t addr)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode_64(&code_next_flc_lo, (uint64_t *)cl, addr);
 }
@@ -192,7 +192,7 @@ EXPORT_SYMBOL(fcr_set_next_flc);
 
 uint64_t fcr_get_next_flc(struct fcr *d)
 {
-	const uint32_t *cl = dce_cl(d);
+	const u32 *cl = dce_cl(d);
 
 	return ((uint64_t)dce_attr_code_decode(&code_next_flc_hi, cl) << 32) |
 		(uint64_t)dce_attr_code_decode(&code_next_flc_lo, cl);

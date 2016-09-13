@@ -29,8 +29,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdint.h>
-#include "compat.h"
+#include <compat.h>
 #include "dce-fd-frc.h"
 #include "dce-attr-encoder-decoder.h"
 
@@ -72,277 +71,316 @@ static struct dce_attr_code code_fd_frc_stream_end = DCE_CODE(4, 15, 1);
 
 void fd_frc_set_cmd(struct fd_attr *d, enum dce_cmd cmd)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_cmd, cl, cmd);
 }
+EXPORT_SYMBOL(fd_frc_set_cmd);
 
 enum dce_cmd fd_frc_get_cmd(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_cmd, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_cmd);
 
-void fd_frc_set_nop_token(struct fd_attr *d, uint32_t token)
+void fd_frc_set_nop_token(struct fd_attr *d, u32 token)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_nop_token, cl, token);
 
 }
+EXPORT_SYMBOL(fd_frc_set_nop_token);
 
-uint32_t fd_frc_get_nop_token(struct fd_attr *d)
+u32 fd_frc_get_nop_token(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_nop_token, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_nop_token);
 
-void fd_frc_set_icid_scope_token(struct fd_attr *d, uint32_t token)
+void fd_frc_set_icid_scope_token(struct fd_attr *d, u32 token)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_icid_scope_token, cl, token);
 }
+EXPORT_SYMBOL(fd_frc_set_icid_scope_token);
 
-uint32_t fd_frc_get_icid_scope_token(struct fd_attr *d)
+u32 fd_frc_get_icid_scope_token(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_icid_scope_token, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_icid_scope_token);
 
-void fd_frc_set_cic_token(struct fd_attr *d, uint32_t token)
+void fd_frc_set_cic_token(struct fd_attr *d, u32 token)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_cic_token, cl, token);
 }
+EXPORT_SYMBOL(fd_frc_set_cic_token);
 
-uint32_t fd_frc_get_cic_token(struct fd_attr *d)
+u32 fd_frc_get_cic_token(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_cic_token, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_cic_token);
 
-void fd_frc_set_fqflush_token(struct fd_attr *d, uint32_t token)
+void fd_frc_set_fqflush_token(struct fd_attr *d, u32 token)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_fqflush_token, cl, token);
 }
+EXPORT_SYMBOL(fd_frc_set_fqflush_token);
 
-uint32_t fd_frc_get_fqflush_token(struct fd_attr *d)
+u32 fd_frc_get_fqflush_token(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_fqflush_token, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_fqflush_token);
 
 
 enum dce_status fd_frc_get_status(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_status, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_status);
 
 void fd_frc_set_scus(struct fd_attr *d, enum dce_scus scus)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_scus, cl, scus);
 }
+EXPORT_SYMBOL(fd_frc_set_scus);
 
 enum dce_scus fd_frc_get_scus(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_scus, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_scus);
 
 void fd_frc_set_usdc(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_usdc, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_usdc);
 
 int fd_frc_get_usdc(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_usdc, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_usdc);
 
 void fd_frc_set_uspc(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_uspc, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_uspc);
 
 int fd_frc_get_uspc(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_uspc, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_uspc);
 
 void fd_frc_set_uhc(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_uhc, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_uhc);
 
 int fd_frc_get_uhc(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_uhc, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_uhc);
 
 void fd_frc_set_ce(struct fd_attr *d, enum dce_comp_effort ce)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_ce, cl, ce);
 }
+EXPORT_SYMBOL(fd_frc_set_ce);
 
 enum dce_comp_effort fd_frc_get_ce(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_ce, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_ce);
 
 void fd_frc_set_cf(struct fd_attr *d, enum dce_comp_fmt cf)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_cf, cl, cf);
 }
+EXPORT_SYMBOL(fd_frc_set_cf);
 
 enum dce_comp_fmt fd_frc_get_cf(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_cf, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_cf);
 
 void fd_frc_set_b64(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_b64, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_b64);
 
 int fd_frc_get_b64(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_b64, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_b64);
 
 void fd_frc_set_rb(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_rb, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_rb);
 
 int fd_frc_get_rb(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_rb, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_rb);
 
 void fd_frc_set_initial(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_initial, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_initial);
 
 int fd_frc_get_initial(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_initial, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_initial);
 
 void fd_frc_set_recycle(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_recycle, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_recycle);
 
 int fd_frc_get_recycle(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_recycle, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_recycle);
 
 void fd_frc_set_scrf(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_scrf, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_scrf);
 
 int fd_frc_get_scrf(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_scrf, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_scrf);
 
 void fd_frc_set_z_flush(struct fd_attr *d, enum dce_z_flush flush)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_z_flush, cl, flush);
 }
+EXPORT_SYMBOL(fd_frc_set_z_flush);
 
 enum dce_z_flush fd_frc_get_z_flush(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_z_flush, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_z_flush);
 
 void fd_frc_set_sf(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_sf, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_sf);
 
 int fd_frc_get_sf(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_sf, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_sf);
 
 void fd_frc_set_se(struct fd_attr *d, int enable)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	dce_attr_code_encode(&code_fd_frc_stream_end, cl, !!enable);
 }
+EXPORT_SYMBOL(fd_frc_set_se);
 
 int fd_frc_get_se(struct fd_attr *d)
 {
-	uint32_t *cl = dce_cl(d);
+	u32 *cl = dce_cl(d);
 
 	return dce_attr_code_decode(&code_fd_frc_stream_end, cl);
 }
+EXPORT_SYMBOL(fd_frc_get_se);
 
 

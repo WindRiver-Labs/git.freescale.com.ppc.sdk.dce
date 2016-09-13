@@ -2,36 +2,28 @@ CROSS_COMPILE ?=
 DESTDIR ?=
 
 CC = $(CROSS_COMPILE)gcc
+AR = $(CROSS_COMPILE)ar
 
-OBJS = restool.o \
-       dprc_commands.o \
-       dpio_commands.o \
-       dpbp_commands.o \
-       dpdcei_commands.o \
-       dprc.o \
-       dpmng.o \
-       dpbp.o \
-       dpio.o \
-       dpdcei.o \
-       fsl_mc_sys.o \
-       dce.o \
+OBJS = dce.o \
        dce-fd-frc.o \
        dce-scf-compression.o \
        dce-scf-decompression.o \
-       #dpdcei-drv.o
+       dpdcei-drv.o \
+       dce-userspace.o
 
-CFLAGS = ${EXTRA_CFLAGS} \
-	  -Iinclude \
-	  -Wall \
-          -Wstrict-prototypes \
-          -Wextra -Wformat \
-          -std=gnu99 \
-          -Wmissing-prototypes \
-          -Wpointer-arith \
-          -Winline \
-          -Werror \
-          -Wundef \
-	  -fmax-errors=10
+CFLAGS = -Iinclude \
+	 -pthread \
+	 ${EXTRA_CFLAGS} \
+	 -Wall \
+	 -Wextra -Wformat \
+	 -std=gnu99 \
+	 -Wmissing-prototypes \
+	 -Wpointer-arith \
+	 -Winline \
+	 -Wundef \
+	 -fmax-errors=1 \
+	 -Wstrict-prototypes
+	 #-Werror
 
 LDFLAGS = -static -Wl,--hash-style=gnu ${EXTRA_CFLAGS}
 
@@ -40,11 +32,13 @@ EXEC_PREFIX = $(DESTDIR)/usr/sbin
 
 HEADER_DEPENDENCIES = $(subst .o,.d,$(OBJS))
 
-all: libdce.a
+all: dce_test
+
+dce_test: tests/dce_test.o libdce.a
+	$(CC) $(CFLAGS) $^ -o $@
 
 libdce.a: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) -lm
-	file $@
+	$(AR) rcs $@ $(OBJS)
 
 install:
 	install -d $(PREFIX) $(EXEC_PREFIX)
@@ -55,7 +49,7 @@ install:
 clean:
 	rm -f $(OBJS) \
 	      $(HEADER_DEPENDENCIES) \
-	      restool
+	      dce_test
 
 %.d: %.c
 	@($(CC) $(CFLAGS) -M $< | \

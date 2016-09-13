@@ -28,13 +28,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <compat.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/ioctl.h>
-#include <stdio.h>
-#include <stdint.h>
-
 
 /* Similarly-named functions */
 #define upper32(a) upper_32_bits(a)

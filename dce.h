@@ -41,7 +41,7 @@
  *   currently two callback forms, process_frame, and process_data
  */
 
-
+#include <fsl_qbman_base.h>
 #include "dpdcei-drv.h"
 #include "dce-fd.h"
 #include "dce-fd-frc.h"
@@ -277,8 +277,8 @@ struct dce_session_params {
 	 * in API */
 	unsigned buffer_pool_id; /* Not supported in current hardware */
 	unsigned buffer_pool_id2; /* Not supported in current hardware */
-	int release_buffers; /* Not supported in current hardware */
-	int encode_base_64; /* session will handle 64 bit encoded data */
+	bool release_buffers; /* Not supported in current hardware */
+	bool encode_base_64; /* session will handle 64 bit encoded data */
 	/* User defined callback function for dce_process_frame() result */
 	dce_callback_frame callback_frame;
 	/* User defined callback function for dce_process_data() result */
@@ -303,11 +303,11 @@ struct dce_session {
 	struct dce_gz_header *gz_header;
 	unsigned buffer_pool_id;
 	unsigned buffer_pool_id2;
-	int release_buffers;
-	int encode_base_64;
+	bool release_buffers;
+	bool encode_base_64;
 	dce_callback_frame callback_frame;
 	dce_callback_data callback_data;
-	struct fsl_mc_device *device;
+	struct dpdcei *dpdcei;
 	struct dce_flow flow;
 	struct dma_hw_mem pending_output;
 	struct dma_hw_mem history;
@@ -337,7 +337,7 @@ int dce_session_create(struct dce_session *session,
  *
  * Return:	Pointer to device. NULL pointer if error
  */
-struct fsl_mc_device *dce_session_device(struct dce_session *session);
+struct dpdcei_priv *dce_session_device(struct dce_session *session);
 
 
 /**
@@ -376,8 +376,8 @@ int dce_process_frame(struct dce_session *session,
 		      struct qbman_fd *input_fd,
 		      struct qbman_fd *output_fd,
 		      enum dce_flush_parameter flush,
-		      int initial_frame,
-		      int recycled_frame,
+		      bool initial_frame,
+		      bool recycled_frame,
 		      void *context);
 
 
@@ -411,8 +411,8 @@ int dce_process_data(struct dce_session *session,
 		     size_t input_len,
 		     size_t output_len,
 		     enum dce_flush_parameter flush,
-		     int initial_request,
-		     int recycled_request,
+		     bool initial_request,
+		     bool recycled_request,
 		     void *context);
 
 
