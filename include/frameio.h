@@ -15,11 +15,11 @@ struct frameio;
 typedef int (*frameio_input_cb)(struct frameio *frameio,
 				struct qbman_swp *swp,
 				int flags,
-				struct qbman_fd *result);
+				struct dpaa2_fd *result);
 /* Send a frame - returns number sent */
 typedef int (*frameio_output_cb)(struct frameio *frameio,
 				 struct qbman_swp *swp,
-				  struct qbman_fd *frame);
+				  struct dpaa2_fd *frame);
 typedef int (*frameio_enable_cb)(struct frameio *frameio);
 
 struct frameio {

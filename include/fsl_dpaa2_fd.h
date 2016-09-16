@@ -31,6 +31,8 @@
 #ifndef __FSL_DPAA2_FD_H
 #define __FSL_DPAA2_FD_H
 
+#include <linux/kernel.h>
+
 /**
  * DOC: DPAA2 FD - Frame Descriptor APIs for DPAA2
  *
@@ -298,7 +300,6 @@ static inline void dpaa2_sg_set_addr(struct dpaa2_sg_entry *sg, dma_addr_t addr)
 	sg->addr_lo = lower_32_bits(addr);
 }
 
-
 static inline bool dpaa2_sg_short_len(const struct dpaa2_sg_entry *sg)
 {
 	return (sg->bpid_offset >> 30) & 0x1;
@@ -431,8 +432,8 @@ static inline void dpaa2_sg_set_final(struct dpaa2_sg_entry *sg, bool final)
  */
 static inline void dpaa2_sg_cpu_to_le(struct dpaa2_sg_entry *sg)
 {
-	uint32_t *p = (uint32_t *)sg;
-	unsigned int i;
+	u32 *p = (u32 *)sg;
+	int i;
 
 	for (i = 0; i < sizeof(*sg) / sizeof(u32); i++)
 		cpu_to_le32s(p++);
@@ -445,8 +446,8 @@ static inline void dpaa2_sg_cpu_to_le(struct dpaa2_sg_entry *sg)
  */
 static inline void dpaa2_sg_le_to_cpu(struct dpaa2_sg_entry *sg)
 {
-	uint32_t *p = (uint32_t *)sg;
-	unsigned int i;
+	u32 *p = (u32 *)sg;
+	int i;
 
 	for (i = 0; i < sizeof(*sg) / sizeof(u32); i++)
 		le32_to_cpus(p++);
@@ -455,7 +456,6 @@ static inline void dpaa2_sg_le_to_cpu(struct dpaa2_sg_entry *sg)
 #define dpaa2_sg_cpu_to_le(sg)
 #define dpaa2_sg_le_to_cpu(sg)
 #endif /* __BIG_ENDIAN */
-
 
 /**
  * struct dpaa2_fl_entry - structure for frame list entry.
@@ -633,7 +633,7 @@ static inline void dpaa2_fl_set_bpid(struct dpaa2_fl_entry *fle, uint16_t bpid)
 /** dpaa2_fl_is_final() - check the final bit is set or not in the frame list.
  * @fle: the given frame list entry.
  *
- * Return final bit settting.
+ * Return final bit setting.
  */
 static inline bool dpaa2_fl_is_final(const struct dpaa2_fl_entry *fle)
 {
@@ -651,124 +651,5 @@ static inline void dpaa2_fl_set_final(struct dpaa2_fl_entry *fle, bool final)
 	fle->bpid_offset &= 0x7FFFFFFF;
 	fle->bpid_offset |= (u32)final << 31;
 }
-
-/**
- * struct dpaa2_dq - the qman result structure
- * @dont_manipulate_directly: the 16 32bit data to represent the whole
- * possible qman dequeue result.
- *
- * When frames are dequeued, the FDs show up inside "dequeue" result structures
- * (if at all, not all dequeue results contain valid FDs). This structure type
- * is intentionally defined without internal detail, and the only reason it
- * isn't declared opaquely (without size) is to allow the user to provide
- * suitably-sized (and aligned) memory for these entries.
- */
-struct dpaa2_dq {
-	uint32_t dont_manipulate_directly[16];
-};
-
-/* Parsing frame dequeue results */
-/* FQ empty */
-#define DPAA2_DQ_STAT_FQEMPTY       0x80
-/* FQ held active */
-#define DPAA2_DQ_STAT_HELDACTIVE    0x40
-/* FQ force eligible */
-#define DPAA2_DQ_STAT_FORCEELIGIBLE 0x20
-/* Valid frame */
-#define DPAA2_DQ_STAT_VALIDFRAME    0x10
-/* FQ ODP enable */
-#define DPAA2_DQ_STAT_ODPVALID      0x04
-/* Volatile dequeue */
-#define DPAA2_DQ_STAT_VOLATILE      0x02
-/* volatile dequeue command is expired */
-#define DPAA2_DQ_STAT_EXPIRED       0x01
-
-/**
- * dpaa2_dq_flags() - Get the stat field of dequeue response
- * @dq: the dequeue result.
- */
-uint32_t dpaa2_dq_flags(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_is_pull() - Check whether the dq response is from a pull
- * command.
- * @dq: the dequeue result.
- *
- * Return 1 for volatile(pull) dequeue, 0 for static dequeue.
- */
-static inline int dpaa2_dq_is_pull(const struct dpaa2_dq *dq)
-{
-	return (int)(dpaa2_dq_flags(dq) & DPAA2_DQ_STAT_VOLATILE);
-}
-
-/**
- * dpaa2_dq_is_pull_complete() - Check whether the pull command is completed.
- * @dq: the dequeue result.
- *
- * Return boolean.
- */
-static inline int dpaa2_dq_is_pull_complete(
-					const struct dpaa2_dq *dq)
-{
-	return (int)(dpaa2_dq_flags(dq) & DPAA2_DQ_STAT_EXPIRED);
-}
-
-/**
- * dpaa2_dq_seqnum() - Get the seqnum field in dequeue response
- * seqnum is valid only if VALIDFRAME flag is TRUE
- * @dq: the dequeue result.
- *
- * Return seqnum.
- */
-uint16_t dpaa2_dq_seqnum(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_odpid() - Get the seqnum field in dequeue response
- * odpid is valid only if ODPVAILD flag is TRUE.
- * @dq: the dequeue result.
- *
- * Return odpid.
- */
-uint16_t dpaa2_dq_odpid(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_fqid() - Get the fqid in dequeue response
- * @dq: the dequeue result.
- *
- * Return fqid.
- */
-uint32_t dpaa2_dq_fqid(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_byte_count() - Get the byte count in dequeue response
- * @dq: the dequeue result.
- *
- * Return the byte count remaining in the FQ.
- */
-uint32_t dpaa2_dq_byte_count(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_frame_count() - Get the frame count in dequeue response
- * @dq: the dequeue result.
- *
- * Return the frame count remaining in the FQ.
- */
-uint32_t dpaa2_dq_frame_count(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_fd_ctx() - Get the frame queue context in dequeue response
- * @dq: the dequeue result.
- *
- * Return the frame queue context.
- */
-uint64_t dpaa2_dq_fqd_ctx(const struct dpaa2_dq *dq);
-
-/**
- * dpaa2_dq_fd() - Get the frame descriptor in dequeue response
- * @dq: the dequeue result.
- *
- * Return the frame descriptor.
- */
-const struct dpaa2_fd *dpaa2_dq_fd(const struct dpaa2_dq *dq);
 
 #endif /* __FSL_DPAA2_FD_H */

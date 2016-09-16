@@ -6,12 +6,23 @@ AR = $(CROSS_COMPILE)ar
 
 OBJS = dce.o \
        dce-fd-frc.o \
+       dce-fd.o \
+       dce-fcr.o \
+       lib/fsl_mc_sys.o \
+       lib/dprc.o \
+       lib/dpio.o \
+       lib/dpdcei.o \
+       lib/vfio_utils.o \
+       lib/qbman_debug.o \
+       lib/qbman_portal.o \
+       lib/dpio_service.o \
        dce-scf-compression.o \
        dce-scf-decompression.o \
        dpdcei-drv.o \
        dce-userspace.o
 
 CFLAGS = -Iinclude \
+	 -g3 \
 	 -pthread \
 	 ${EXTRA_CFLAGS} \
 	 -Wall \

@@ -36,9 +36,12 @@
 
 #include <fsl_mc_cmd.h>
 #include <fsl_mc_sys.h>
+#include <fsl_dprc.h>
 #include <fsl_dpdcei.h>
 #include <fsl_dpdcei_cmd.h>
 #include <fsl_qbman_base.h>
+#include <vfio_utils.h>
+#include <qbman_portal.h>
 #include "dpdcei-drv.h"
 #include "dce-private.h"
 
@@ -46,7 +49,7 @@
 
 #define LDPAA_DCE_DESCRIPTION "Freescale LDPAA DCE Driver"
 
-#define DQ_STORE_SIZE	16
+#define DQ_STORE_SIZE	0xA000
 
 #define CONFIG_FSL_DCE_FLOW_LIMIT 65535
 
@@ -100,26 +103,32 @@ static void clear_flow_table_entry(struct dce_flow *flow, u32 entry)
 static struct dpdcei_priv *compression;
 static struct dpdcei_priv *decompression;
 
+static int __cold dpdcei_drv_setup(void);
+
 struct dpdcei_priv *get_compression_device(void)
 {
+	if (!compression)
+		dpdcei_drv_setup();
 	return compression;
 }
 EXPORT_SYMBOL(get_compression_device);
 
 struct dpdcei_priv *get_decompression_device(void)
 {
+	if (!decompression)
+		dpdcei_drv_setup();
 	return decompression;
 }
 EXPORT_SYMBOL(get_decompression_device);
-
-static int __cold dpdcei_drv_setup(void);
 
 int dce_flow_create(struct dpdcei_priv *device, struct dce_flow *flow)
 {
 	int err;
 
-	if (!device)
-		dpdcei_drv_setup();
+	if (!device) {
+		pr_err("Null device passed to %s\n", __func__);
+		return -EINVAL;
+	}
 
 	/* associate flow to device */
 	flow->device = device;
@@ -160,7 +169,7 @@ int dce_flow_destroy(struct dce_flow *flow)
 }
 EXPORT_SYMBOL(dce_flow_destroy);
 
-int enqueue_fd(struct dce_flow *flow, struct qbman_fd *fd)
+int enqueue_fd(struct dce_flow *flow, struct dpaa2_fd *fd)
 {
 	struct dpdcei_priv *priv = flow->device;
 	enum dce_cmd cmd = fd_frc_get_cmd((struct fd_attr *)fd);
@@ -218,7 +227,7 @@ static int dpaa2_dce_pull_dequeue_rx(struct dpdcei_priv *priv)
 	int err = 0;
 	int is_last = 0;
 	struct qbman_dq *dq;
-	const struct qbman_fd *fd;
+	const struct dpaa2_fd *fd;
 	struct dce_flow *flow;
 	u32 key;
 
@@ -239,7 +248,7 @@ static int dpaa2_dce_pull_dequeue_rx(struct dpdcei_priv *priv)
 		}
 
 		/* Obtain FD and process it */
-		fd = qbman_dq_fd(dq);
+		fd = dpaa2_dq_fd(dq);
 		/* We are already CPU-affine, and since we aren't going
 		 * to start more than one Rx thread per CPU, we're
 		 * good enough for now.
@@ -372,12 +381,16 @@ static void dpaa2_dce_free_store(struct dpdcei_priv *priv)
 #define DPRC_GET_ICID_FROM_POOL         (uint16_t)(~(0))
 #define DPRC_GET_PORTAL_ID_FROM_POOL    (int)(~(0))
 
+static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id);
+
 static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engine)
 {
+	struct dprc_res_req res_req;
 	struct dpdcei_priv *priv = NULL;
 	struct dpdcei_rx_queue_attr rx_attr;
 	struct dpdcei_tx_queue_attr tx_attr;
 	struct dpdcei_cfg cfg;
+	int dprc_id, dpio_id;
 	int err = 0;
 
 	if (engine != DPDCEI_ENGINE_COMPRESSION &&
@@ -403,6 +416,10 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	/* in flight ring initialization */
 	atomic_set(&priv->frames_in_flight, 0);
 
+	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
+	appease_mc(mc_io, dprc_id, dpio_id);
+	pr_info("Appeased mc\n");
+
 	/* get a handle for the DPDCEI this interface is associated with */
 	cfg = (struct dpdcei_cfg){.engine = engine, .priority = 1};
 	err = dpdcei_create(mc_io, MC_CMD_FLAG_PRI, &cfg, &priv->token);
@@ -415,6 +432,27 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 				&priv->dpdcei_attrs);
 	if (err) {
 		pr_err("DCE: dpdcei_get_attributes() failed %d\n", err);
+		goto err_get_attr;
+	}
+
+
+	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, priv->token); /* jsut make sure it is closed? */
+	vfio_force_rescan();
+
+	/* Associate dpdcei with dprc */
+	strcpy(res_req.type, "dpdcei");
+	res_req.num = 1;
+	res_req.options = DPRC_RES_REQ_OPT_EXPLICIT | DPRC_RES_REQ_OPT_PLUGGED;
+	res_req.id_base_align = priv->dpdcei_attrs.id;
+	err = dprc_assign(mc_io, MC_CMD_FLAG_PRI, priv->token, dprc_id, &res_req);
+	if (err) {
+		pr_err("dprc_assign failed with error code %d\n", err);
+		goto err_get_attr;
+	}
+
+	err = dpdcei_open(mc_io, MC_CMD_FLAG_PRI, priv->dpdcei_attrs.id, &priv->token);
+	if (err) {
+		pr_err("dpdcei_open failed with error code %d\n", err);
 		goto err_get_attr;
 	}
 
@@ -454,10 +492,15 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	}
 	priv->tx_fqid = tx_attr.fqid;
 
+
+
 	/* dpio store */
 	err = dpaa2_dce_alloc_store(priv);
 	if (err)
 		goto err_get_attr;
+
+	/* Get dpio */
+	priv->dpio_p = dpaa2_io_create();
 
 	/* dpio services */
 	err = dpdcei_dpio_service_setup(priv);
@@ -477,12 +520,6 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 		pr_err("DCE: dpdcei_enable failed %d\n", err);
 		goto err_enable;
 	}
-
-	/* Share dpdcei between threads  */
-	if (priv->dpdcei_attrs.engine == DPDCEI_ENGINE_COMPRESSION)
-		compression = priv;
-	else if (priv->dpdcei_attrs.engine == DPDCEI_ENGINE_DECOMPRESSION)
-		decompression = priv;
 
 	return priv;
 err_enable:
@@ -533,12 +570,17 @@ static int __cold dpdcei_drv_setup(void)
 		goto err_comp_setup;
 	}
 
+	/* FIXME: this is a hack to avoid setup issues */
+	decompression = compression;
+
+#if 0
 	decompression = dpdcei_setup(mc_io, DPDCEI_ENGINE_DECOMPRESSION);
 	if (!decompression) {
 		pr_err("Failed to setup decompression dpdcei\n");
 		err = -EACCES;
 		goto err_decomp_setup;
 	}
+#endif
 	return err;
 
 err_decomp_setup:
@@ -550,4 +592,59 @@ err_mc_io_init:
 err_mc_io_alloc:
 	spin_unlock(&driver_lock);
 	return err;
+}
+
+#define QMAN_REV_4000   0x04000000
+static struct qbman_swp *dpio_swp;
+
+static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id) {
+	char dpio_id_str[50];
+	char dprc_id_str[50];
+	uint16_t dprc_token, dpio_token;
+	struct qbman_swp_desc desc_swp;
+	int err;
+
+	printf("INIT\n");
+	/* ***************************************** RC  */
+	assert(!dprc_open(mc_io, 0, dprc_id, &dprc_token));
+	snprintf(dprc_id_str, sizeof(dprc_id_str), "dprc.%i", dprc_id);
+	printf("Attached DPRC: %x\n", dprc_id);
+	vfio_force_rescan();
+	/* ***************************************** IO #1 */
+	assert(!dpio_open(mc_io, 0, dpio_id, &dpio_token));
+	vfio_force_rescan();
+	snprintf(dpio_id_str, sizeof(dpio_id_str), "dpio.%d", dpio_id);
+	printf("Attached: %s\n", dpio_id_str);
+
+
+	printf("BIND %s\n", dprc_id_str);
+	err = vfio_bind_container(dprc_id_str);
+	if (err) {
+		pr_err("vfio_bind_container() failed\n");
+		abort();
+	}
+	err = vfio_setup(dprc_id_str);
+	if (err) {
+		pr_err("vfio_setup\n");
+		abort();
+	}
+
+	vfio_force_rescan();
+
+	printf("Enable IO\n");
+	/* ***************************************** ENABLE IO */
+	assert(!dpio_enable(mc_io, 0, dpio_token));
+
+	/* dpio 9 SWP */
+	desc_swp.cena_bar = vfio_map_portal_mem(dpio_id_str, PORTAL_MEM_CENA);
+	assert(desc_swp.cena_bar);
+
+	desc_swp.cinh_bar = vfio_map_portal_mem(dpio_id_str, PORTAL_MEM_CINH);
+	assert(desc_swp.cinh_bar);
+
+	desc_swp.idx = dpio_id;
+	desc_swp.eqcr_mode = qman_eqcr_vb_ring;
+	desc_swp.irq = -1;
+	desc_swp.qman_version = QMAN_REV_4000;
+	dpio_swp = qbman_swp_init(&desc_swp);
 }

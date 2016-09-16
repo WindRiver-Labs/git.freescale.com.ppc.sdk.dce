@@ -59,25 +59,25 @@ MODULE_LICENSE("Dual BSD/GPL");
 struct work_unit {
 	union store {
 		/* faster if aligned */
-		struct qbman_fd fd_list_store[3] __aligned(64);
+		struct dpaa2_fd fd_list_store[3] __aligned(64);
 		struct {
-			struct qbman_fd output_fd;
-			struct qbman_fd input_fd;
-			struct qbman_fd scf_fd;
+			struct dpaa2_fd output_fd;
+			struct dpaa2_fd input_fd;
+			struct dpaa2_fd scf_fd;
 			void *context;
 		};
 	} store;
 	struct scf_c_cfg scf_result __aligned(64); /* must 64 byte align */
-	struct qbman_fd fd_list;
+	struct dpaa2_fd fd_list;
 };
 
 /* trigger_user_callback - takes the information from the callbacks and
  * `massages' the data into user friendly format */
 /* TODO: make sure to mention that fd must be completely clean*/
 static void trigger_user_callback(struct dce_session *session,
-				  struct qbman_fd const *fd)
+				  struct dpaa2_fd const *fd)
 {
-	union store *store = (void *)qbman_fd_get_addr(fd);
+	union store *store = (void *)dpaa2_fd_get_addr(fd);
 	struct work_unit *work_unit =
 		container_of(store, struct work_unit, store);
 	uint8_t status = fd_frc_get_status((struct fd_attr *)fd);
@@ -101,7 +101,7 @@ static void trigger_user_callback(struct dce_session *session,
 		break;
 	case FULLY_PROCESSED:
 	case STREAM_END:
-		input_consumed = qbman_fd_get_len(&store->input_fd);
+		input_consumed = dpaa2_fd_get_len(&store->input_fd);
 		break;
 	default:
 		/* some other unexpected type of suspend, no input
@@ -113,9 +113,9 @@ static void trigger_user_callback(struct dce_session *session,
 					&store->output_fd, input_consumed,
 					store->context);
 	} else {
-		size_t output_produced = qbman_fd_get_len(&store->output_fd);
-		dma_addr_t output = qbman_fd_get_addr(&store->output_fd);
-		dma_addr_t input = qbman_fd_get_addr(&store->input_fd);
+		size_t output_produced = dpaa2_fd_get_len(&store->output_fd);
+		dma_addr_t output = dpaa2_fd_get_addr(&store->output_fd);
+		dma_addr_t input = dpaa2_fd_get_addr(&store->input_fd);
 
 		session->callback_data(session, status, input, output,
 				       input_consumed, output_produced,
@@ -129,7 +129,7 @@ static void trigger_user_callback(struct dce_session *session,
  * This simple callback does simple checking the calls a function to trigger the
  * user callback if all checks were passed */
 static void internal_callback(struct dce_flow *flow, u32 cmd,
-			    const struct qbman_fd *fd)
+			    const struct dpaa2_fd *fd)
 {
 	struct dce_session *session = container_of(flow,
 						   struct dce_session,
@@ -291,8 +291,8 @@ int dce_session_destroy(struct dce_session *session)
 EXPORT_SYMBOL(dce_session_destroy);
 
 int dce_process_frame(struct dce_session *session,
-		      struct qbman_fd *input_fd,
-		      struct qbman_fd *output_fd,
+		      struct dpaa2_fd *input_fd,
+		      struct dpaa2_fd *output_fd,
 		      enum dce_flush_parameter flush,
 		      bool initial_frame,
 		      bool recycled_frame,
@@ -300,8 +300,8 @@ int dce_process_frame(struct dce_session *session,
 {
 	struct dce_flow *flow = &session->flow;
 	struct work_unit *work_unit = vfio_alloc(sizeof(struct work_unit), 64);
-	struct qbman_fd *fd_list;
-	struct qbman_fd *scf_fd;
+	struct dpaa2_fd *fd_list;
+	struct dpaa2_fd *scf_fd;
 	int ret;
 
 #ifdef debug
@@ -330,9 +330,9 @@ int dce_process_frame(struct dce_session *session,
 	 * output were passed in with correct setup by our caller */
 
 	/* SCF */
-	qbman_sg_set_final((struct qbman_sg_entry *)scf_fd, 1);
-	qbman_fd_set_addr(scf_fd, (dma_addr_t) &work_unit->scf_result);
-	qbman_fd_set_len(scf_fd, sizeof(struct scf_c_cfg));
+	dpaa2_sg_set_final((struct qbman_sg_entry *)scf_fd, 1);
+	dpaa2_fd_set_addr(scf_fd, (dma_addr_t) &work_unit->scf_result);
+	dpaa2_fd_set_len(scf_fd, sizeof(struct scf_c_cfg));
 	/* Set to recycle or truncate mode, don't need to do this every time for
 	 * statefull sessions. dont need to do it at all for stateless sessions.
 	 * Doing it every time for now. pmode 1 = truncate, 0 = recycle */
@@ -344,9 +344,9 @@ int dce_process_frame(struct dce_session *session,
 				true);
 
 	/* FD */
-	qbman_fd_set_len(fd_list, qbman_fd_get_len(input_fd));
-	qbman_fd_set_format(fd_list, qbman_fd_list);
-	qbman_fd_set_addr(fd_list, (dma_addr_t)work_unit->store.fd_list_store);
+	dpaa2_fd_set_len(fd_list, dpaa2_fd_get_len(input_fd));
+	dpaa2_fd_set_format(fd_list, dpaa2_fd_list);
+	dpaa2_fd_set_addr(fd_list, (dma_addr_t)work_unit->store.fd_list_store);
 	fd_frc_set_ce((struct fd_attr *)fd_list, session->compression_effort);
 	/* hardware bug requires the SCR flush to occur every time */
 	fd_frc_set_scrf((struct fd_attr *)fd_list, true);
@@ -439,16 +439,16 @@ int dce_process_data(struct dce_session *session,
 		     bool recycled_frame,
 		     void *context)
 {
-	struct qbman_fd input_fd = EMPTY_DPAA_FD,
+	struct dpaa2_fd input_fd = EMPTY_DPAA_FD,
 		output_fd = EMPTY_DPAA_FD;
 
 	/* Input fd setup */
-	qbman_fd_set_addr(&input_fd, input);
-	qbman_fd_set_len(&input_fd, input_len);
+	dpaa2_fd_set_addr(&input_fd, input);
+	dpaa2_fd_set_len(&input_fd, input_len);
 
 	/* Output fd setup */
-	qbman_fd_set_addr(&output_fd, output);
-	qbman_fd_set_len(&output_fd, output_len);
+	dpaa2_fd_set_addr(&output_fd, output);
+	dpaa2_fd_set_len(&output_fd, output_len);
 
 	return dce_process_frame(session, &input_fd, &output_fd, flush,
 				 initial_frame, recycled_frame, context);

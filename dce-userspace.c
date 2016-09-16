@@ -127,7 +127,7 @@ static int setup_dce(void)
 	ret = dce_session_create(&comp_session, &params);
 	if (ret) {
 		atomic_dec(&users);
-		return -EACCES;
+		return -ret;
 	}
 
 	params.engine = DCE_DECOMPRESSION;
@@ -135,7 +135,7 @@ static int setup_dce(void)
 	if (ret) {
 		dce_session_destroy(&comp_session);
 		atomic_dec(&users);
-		return -EACCES;
+		return -ret;
 	}
 	return 0;
 }

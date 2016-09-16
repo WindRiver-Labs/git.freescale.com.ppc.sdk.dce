@@ -541,17 +541,17 @@ void qbman_pull_desc_set_storage(struct qbman_pull_desc *d,
 				 dma_addr_t storage_phys,
 				 int stash)
 {
-	uint32_t *cl = qb_cl(d);
+//	uint32_t *cl = qb_cl(d);
 	/* Squiggle the pointer 'storage' into the extra 2 words of the
 	 * descriptor (which aren't copied to the hw command) */
-	*(void **)&cl[4] = storage;
-	if (!storage) {
-		qb_attr_code_encode(&code_pull_rls, cl, 0);
-		return;
-	}
-	qb_attr_code_encode(&code_pull_rls, cl, 1);
-	qb_attr_code_encode(&code_pull_stash, cl, !!stash);
-	qb_attr_code_encode_64(&code_pull_rsp_lo, (uint64_t *)cl, storage_phys);
+//	*(void **)&cl[4] = storage;
+//	if (!storage) {
+//		qb_attr_code_encode(&code_pull_rls, cl, 0);
+//		return;
+//	}
+//	qb_attr_code_encode(&code_pull_rls, cl, 1);
+//	qb_attr_code_encode(&code_pull_stash, cl, !!stash);
+//	qb_attr_code_encode_64(&code_pull_rsp_lo, (uint64_t *)cl, storage_phys);
 }
 
 void qbman_pull_desc_set_numframes(struct qbman_pull_desc *d, uint8_t numframes)

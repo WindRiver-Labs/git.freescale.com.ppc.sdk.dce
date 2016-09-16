@@ -25,6 +25,7 @@
 #ifndef _FSL_QBMAN_PORTAL_H
 #define _FSL_QBMAN_PORTAL_H
 
+#include "compat.h"
 #include <fsl_qbman_base.h>
 
 /**

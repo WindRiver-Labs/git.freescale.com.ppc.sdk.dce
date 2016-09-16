@@ -71,7 +71,7 @@ struct flc_dma {
 
 struct dce_flow {
 	/* the callback to be invoked when the respose arrives */
-	void (*cb)(struct dce_flow *, u32 cmd, const struct qbman_fd *fd);
+	void (*cb)(struct dce_flow *, u32 cmd, const struct dpaa2_fd *fd);
 	struct dpdcei_priv *device;
 
 	/* flow memory: both virtual and dma memory */
@@ -84,7 +84,7 @@ struct dce_flow {
 int dce_flow_create(struct dpdcei_priv *dev, struct dce_flow *flow);
 int dce_flow_destroy(struct dce_flow *flow);
 
-int enqueue_fd(struct dce_flow *flow, struct qbman_fd *fd);
+int enqueue_fd(struct dce_flow *flow, struct dpaa2_fd *fd);
 int enqueue_nop(struct dce_flow *flow);
 int enqueue_cic(struct dce_flow *flow);
 

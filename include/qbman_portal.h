@@ -23,6 +23,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __QBMAN_PORTAL_H
+#define __QBMAN_PORTAL_H
+
 #include "qbman_private.h"
 #include <fsl_qbman_portal.h>
 
@@ -200,7 +203,7 @@ static inline void qb_attr_code_rotate_ls(struct qb_attr_code *code,
 static inline uint32_t qb_attr_code_decode(const struct qb_attr_code *code,
 				      const uint32_t *cacheline)
 {
-	return d32_uint32_t(code->lsoffset, code->width, cacheline[code->word]);
+	return d32_u32(code->lsoffset, code->width, cacheline[code->word]);
 }
 static inline uint64_t qb_attr_code_decode_64(const struct qb_attr_code *code,
 				      const uint64_t *cacheline)
@@ -213,8 +216,8 @@ static inline void qb_attr_code_encode(const struct qb_attr_code *code,
 				       uint32_t *cacheline, uint32_t val)
 {
 	cacheline[code->word] =
-		r32_uint32_t(code->lsoffset, code->width, cacheline[code->word])
-		| e32_uint32_t(code->lsoffset, code->width, val);
+		r32_u32(code->lsoffset, code->width, cacheline[code->word])
+		| e32_u32(code->lsoffset, code->width, val);
 }
 static inline void qb_attr_code_encode_64(const struct qb_attr_code *code,
 				       uint64_t *cacheline, uint64_t val)
@@ -260,3 +263,5 @@ static inline int32_t qb_attr_code_makesigned(const struct qb_attr_code *code,
  * correctly with const and non-const inputs (and similarly-qualified outputs).
  */
 #define qb_cl(d) (&(d)->dont_manipulate_directly[0])
+
+#endif /* __QBMAN_PORTAL_H */

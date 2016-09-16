@@ -41,6 +41,9 @@
  *   currently two callback forms, process_frame, and process_data
  */
 
+#ifndef __DCE_H
+#define __DCE_H
+
 #include <fsl_qbman_base.h>
 #include "dpdcei-drv.h"
 #include "dce-fd.h"
@@ -216,8 +219,8 @@ struct dce_session;
  */
 typedef void (*dce_callback_frame)(struct dce_session *session,
 		uint8_t status,
-		struct qbman_fd *input_fd,
-		struct qbman_fd *output_fd,
+		struct dpaa2_fd *input_fd,
+		struct dpaa2_fd *output_fd,
 		size_t input_consumed,
 		void *context);
 
@@ -373,8 +376,8 @@ int dce_session_destroy(struct dce_session *session);
  *		-EBUSY if the device is busy and call must be reattempted
  */
 int dce_process_frame(struct dce_session *session,
-		      struct qbman_fd *input_fd,
-		      struct qbman_fd *output_fd,
+		      struct dpaa2_fd *input_fd,
+		      struct dpaa2_fd *output_fd,
 		      enum dce_flush_parameter flush,
 		      bool initial_frame,
 		      bool recycled_frame,
@@ -434,3 +437,5 @@ int dce_gz_header_update(struct dce_session *session);
 
 /* Maybe add a scatter gather version of process to handle kernel scatter
  * gather */
+
+#endif /* __DCE_H */

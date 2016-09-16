@@ -85,36 +85,36 @@
  *                reg_val = r32_int(19, 1, reg_value);
  *
  */
+
 #define MAKE_MASK32(width) (width == 32 ? 0xffffffff : \
-				 (uint32_t)((1 << width) - 1))
+				 (u32)((1 << width) - 1))
 #define DECLARE_CODEC32(t) \
-static inline uint32_t e32_##t(uint32_t lsoffset, uint32_t width, t val) \
+static inline u32 e32_##t(u32 lsoffset, u32 width, t val) \
 { \
 	BUG_ON(width > (sizeof(t) * 8)); \
-	return ((uint32_t)val & MAKE_MASK32(width)) << lsoffset; \
+	return ((u32)val & MAKE_MASK32(width)) << lsoffset; \
 } \
-static inline t d32_##t(uint32_t lsoffset, uint32_t width, uint32_t val) \
+static inline t d32_##t(u32 lsoffset, u32 width, u32 val) \
 { \
 	BUG_ON(width > (sizeof(t) * 8)); \
 	return (t)((val >> lsoffset) & MAKE_MASK32(width)); \
 } \
-static inline uint32_t i32_##t(uint32_t lsoffset, uint32_t width, \
-				uint32_t val) \
+static inline u32 i32_##t(u32 lsoffset, u32 width, \
+				u32 val) \
 { \
 	BUG_ON(width > (sizeof(t) * 8)); \
 	return e32_##t(lsoffset, width, d32_##t(lsoffset, width, val)); \
 } \
-static inline uint32_t r32_##t(uint32_t lsoffset, uint32_t width, \
-				uint32_t val) \
+static inline u32 r32_##t(u32 lsoffset, u32 width, \
+				u32 val) \
 { \
 	BUG_ON(width > (sizeof(t) * 8)); \
 	return ~(MAKE_MASK32(width) << lsoffset) & val; \
 }
-DECLARE_CODEC32(uint32_t)
+DECLARE_CODEC32(u32)
 DECLARE_CODEC32(uint16_t)
 DECLARE_CODEC32(uint8_t)
 DECLARE_CODEC32(int)
-
 	/*********************/
 	/* Debugging assists */
 	/*********************/
@@ -126,6 +126,7 @@ static inline void __hexdump(unsigned long start, unsigned long end,
 		unsigned int pos = 0;
 		char buf[64];
 		int nl = 0;
+
 		pos += sprintf(buf + pos, "%08lx: ", start);
 		do {
 			if ((start < p) || (start >= (p + sz)))
@@ -155,6 +156,7 @@ static inline void hexdump(const void *ptr, size_t sz)
 	unsigned long start = p & ~(unsigned long)15;
 	unsigned long end = (p + sz + 15) & ~(unsigned long)15;
 	const unsigned char *c = ptr;
+
 	__hexdump(start, end, p, sz, c);
 }
 

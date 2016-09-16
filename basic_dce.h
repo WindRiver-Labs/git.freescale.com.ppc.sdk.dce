@@ -34,6 +34,8 @@
 #ifndef __BASIC_DCE_H
 #define __BASIC_DCE_H
 
+#include "dce.h"
+
 /* this allocator is currently a place holder for a more efficient allocator
  * that will eliminate the need for copying input data to a kmalloc buf */
 #define dce_alloc(x) malloc(x)
