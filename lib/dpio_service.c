@@ -45,6 +45,7 @@
 #include <assert.h>
 #include <libgen.h>
 #include <stdlib.h>
+#include <semaphore.h>
 
 #include "fsl_mc_cmd.h"
 #include "fsl_dpci.h"
@@ -278,6 +279,7 @@ struct dpaa2_io *dpaa2_io_create()//const struct dpaa2_io_desc *desc)
 		kfree(obj);
 		return NULL;
 	}
+	sem_t *sem = sem_open(SNAME, O_CREAT, 0644, 0);
 
 	return obj;
 }
@@ -362,6 +364,9 @@ printf("qbman_result_is_SCN()\n");
 			goto done;
 		dq = qbman_swp_dqrr_next(swp);
 	}
+	sem_t *sem = sem_open(SNAME, 0);
+	sem_post(sem);
+	sem_close(sem);
 done:
 	qbman_swp_interrupt_clear_status(swp, status);
 	qbman_swp_interrupt_set_inhibit(swp, 0);
@@ -537,6 +542,7 @@ int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
 
 	qbman_pull_desc_clear(&pd);
 	qbman_pull_desc_set_storage(&pd, s->vaddr, s->paddr, 1);
+	//qbman_pull_desc_set_storage(&pd, NULL, NULL, 0);
 	qbman_pull_desc_set_numframes(&pd, (u8)s->max);
 	qbman_pull_desc_set_fq(&pd, fqid);
 	d = service_select(d);

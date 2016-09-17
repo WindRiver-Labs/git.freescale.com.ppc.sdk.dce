@@ -378,20 +378,20 @@ int dce_process_frame(struct dce_session *session,
 		if (session->engine == DCE_COMPRESSION) {
 			scf_c_cfg_set_pending_output_ptr(
 				(struct scf_c_cfg*)&work_unit->scf_result,
-				session->pending_output.paddr);
+				session->pending_output.vaddr);
 			scf_c_cfg_set_history_ptr(
 				(struct scf_c_cfg*)&work_unit->scf_result,
-				session->history.paddr);
+				session->history.vaddr);
 		} else if (session->engine == DCE_DECOMPRESSION) {
 			scf_d_cfg_set_pending_output_ptr(
 				(struct scf_d_cfg*)&work_unit->scf_result,
-				session->pending_output.paddr);
+				session->pending_output.vaddr);
 			scf_d_cfg_set_history_ptr(
 				(struct scf_d_cfg*)&work_unit->scf_result,
-				session->history.paddr);
+				session->history.vaddr);
 			scf_d_cfg_set_decomp_ctx_ptr(
 				(struct scf_d_cfg*)&work_unit->scf_result,
-				session->decomp_context.paddr);
+				session->decomp_context.vaddr);
 		} else {
 			ret = -EINVAL;
 			goto fail;

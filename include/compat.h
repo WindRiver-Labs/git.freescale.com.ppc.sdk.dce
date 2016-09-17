@@ -54,6 +54,8 @@
 #include <inttypes.h>
 #include <error.h>
 
+#include <vfio_utils.h>
+
 /* The following definitions are primarily to allow the single-source driver
  * interfaces to be included by arbitrary program code. Ie. for interfaces that
  * are also available in kernel-space, these definitions provide compatibility
@@ -612,8 +614,8 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 #define atomic_sub_and_test(i, v) (atomic_sub_return(i, v) == 0)
 
 /* Place holder until a real vfio setup is established */
-#define vfio_alloc(s, a) malloc(s)
-#define vfio_free free
+#define vfio_alloc(s, a) vfio_setup_dma(0xA000)
+#define vfio_free(x)
 
 struct work_struct;
 typedef void (*work_func_t)(struct work_struct *work);

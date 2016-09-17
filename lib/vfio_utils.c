@@ -80,17 +80,18 @@ void* vfio_setup_dma(uint64_t dma_size)
 		perror("mmap failed : ");
 		return NULL;
 	}
-	printf("Got address %p\n", (void*) dma_map.vaddr);
 	dma_map.size = dma_size;
 	dma_map.iova = dma_map.vaddr; /* 1MB starting at 0x0 from device view */
 	dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
+
 	ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &dma_map);
 	if (ret) {
 		perror("DMA map ioctl failed: ");
 		return NULL;
 	}
-	printf("Mapped %lu bytes at vaddr %p\n", dma_size,
-	       (void*)dma_map.vaddr);
+	sleep(1);
+	printf("Mapped %lu bytes at vaddr %p\n", dma_size, (void*)dma_map.vaddr);
+	sleep(1);
 	return (void*) dma_map.vaddr;
 }
 

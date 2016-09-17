@@ -46,6 +46,8 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <pthread.h>
+
+#include <vfio_utils.h>
 #include "basic_dce.h"
 
 struct dma_item {
@@ -127,7 +129,7 @@ static int setup_dce(void)
 	ret = dce_session_create(&comp_session, &params);
 	if (ret) {
 		atomic_dec(&users);
-		return -ret;
+		return ret;
 	}
 
 	params.engine = DCE_DECOMPRESSION;
@@ -135,7 +137,7 @@ static int setup_dce(void)
 	if (ret) {
 		dce_session_destroy(&comp_session);
 		atomic_dec(&users);
-		return -ret;
+		return ret;
 	}
 	return 0;
 }
@@ -180,7 +182,7 @@ int bdce_process_data(enum dce_engine dce_mode,
 			/* maybe a different pthread already opened it. Take a
 			 * pause and check again */
 			/* ret = pthread_yield(); */
-			printf("attempt to open dce returned errno code %d\n",
+			printf("attempt to open dce returned error code %d\n",
 					ret);
 			if (dce < 0)
 				/* no one was able to open the dce */
@@ -235,4 +237,9 @@ err_timedout:
 	*output_produced = work_unit.output_produced;
 err_enqueue:
 	return ret;
+}
+
+void *dce_alloc(size_t sz)
+{
+	return vfio_alloc(sz, 0);
 }

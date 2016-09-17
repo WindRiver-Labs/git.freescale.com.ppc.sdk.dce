@@ -49,7 +49,7 @@
 
 #define LDPAA_DCE_DESCRIPTION "Freescale LDPAA DCE Driver"
 
-#define DQ_STORE_SIZE	0xA000
+#define DQ_STORE_SIZE	16
 
 #define CONFIG_FSL_DCE_FLOW_LIMIT 65535
 
@@ -377,6 +377,7 @@ static void dpaa2_dce_free_store(struct dpdcei_priv *priv)
 }
 
 #define DPRC_CFG_OPT_TOPOLOGY_CHANGES_ALLOWED   0x00000008
+#define ROOT_DPRC 1
 
 #define DPRC_GET_ICID_FROM_POOL         (uint16_t)(~(0))
 #define DPRC_GET_PORTAL_ID_FROM_POOL    (int)(~(0))
@@ -390,6 +391,7 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	struct dpdcei_rx_queue_attr rx_attr;
 	struct dpdcei_tx_queue_attr tx_attr;
 	struct dpdcei_cfg cfg;
+	uint16_t root_dprc_token;
 	int dprc_id, dpio_id;
 	int err = 0;
 
@@ -435,21 +437,26 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 		goto err_get_attr;
 	}
 
-
-	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, priv->token); /* jsut make sure it is closed? */
+	/* just make sure it is closed? */
+	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, priv->token);
 	vfio_force_rescan();
 
 	/* Associate dpdcei with dprc */
+	err = dprc_open(mc_io, MC_CMD_FLAG_PRI, ROOT_DPRC, &root_dprc_token);
+	if (err) {
+		pr_err("dprc_open() failed to open the root container\n");
+	}
 	strcpy(res_req.type, "dpdcei");
 	res_req.num = 1;
 	res_req.options = DPRC_RES_REQ_OPT_EXPLICIT | DPRC_RES_REQ_OPT_PLUGGED;
 	res_req.id_base_align = priv->dpdcei_attrs.id;
-	err = dprc_assign(mc_io, MC_CMD_FLAG_PRI, priv->token, dprc_id, &res_req);
+	err = dprc_assign(mc_io, MC_CMD_FLAG_PRI, root_dprc_token, dprc_id, &res_req);
 	if (err) {
 		pr_err("dprc_assign failed with error code %d\n", err);
 		goto err_get_attr;
 	}
 
+	vfio_force_rescan();
 	err = dpdcei_open(mc_io, MC_CMD_FLAG_PRI, priv->dpdcei_attrs.id, &priv->token);
 	if (err) {
 		pr_err("dpdcei_open failed with error code %d\n", err);
@@ -491,7 +498,6 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 		goto err_get_attr;
 	}
 	priv->tx_fqid = tx_attr.fqid;
-
 
 
 	/* dpio store */

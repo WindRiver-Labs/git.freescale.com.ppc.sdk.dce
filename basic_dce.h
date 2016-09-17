@@ -38,8 +38,8 @@
 
 /* this allocator is currently a place holder for a more efficient allocator
  * that will eliminate the need for copying input data to a kmalloc buf */
-#define dce_alloc(x) malloc(x)
-#define dce_free(x) free(x)
+void *dce_alloc(size_t sz);
+#define dce_free(x)
 
 /**
  * dce_process_data() - Compress or decompress arbitrary data asynchronously

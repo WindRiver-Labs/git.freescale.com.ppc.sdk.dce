@@ -36,6 +36,9 @@
 #include "fsl_dpaa2_fd.h"
 #include "dpaa2_io_portal_priv.h"
 
+//#define SNAME "/var/local/io_service_sem"
+#define SNAME "/io_service_sem"
+
 struct dpaa2_io;
 struct dpaa2_io_store;
 struct device;
@@ -264,10 +267,10 @@ struct __attribute__ ((__packed__)) dpaa2_dq {
 #define DPAA2_DQ_STAT_EXPIRED       0x01
 
 /**
- * dpaa2_dq_flags() - Get the stat field of dequeue response
+ * qbman_result_DQ_flags() - Get the stat field of dequeue response
  * @dq: the dequeue result.
  */
-u32 dpaa2_dq_flags(const struct dpaa2_dq *dq);
+//u32 qbman_result_DQ_flags(const struct dpaa2_dq *dq);
 
 /**
  * dpaa2_dq_is_pull() - Check whether the dq response is from a pull
@@ -278,7 +281,7 @@ u32 dpaa2_dq_flags(const struct dpaa2_dq *dq);
  */
 static inline int dpaa2_dq_is_pull(const struct dpaa2_dq *dq)
 {
-	return (int)(dpaa2_dq_flags(dq) & DPAA2_DQ_STAT_VOLATILE);
+	return (int)(qbman_result_DQ_flags(dq) & DPAA2_DQ_STAT_VOLATILE);
 }
 
 /**
@@ -290,7 +293,7 @@ static inline int dpaa2_dq_is_pull(const struct dpaa2_dq *dq)
 static inline int dpaa2_dq_is_pull_complete(
 					const struct dpaa2_dq *dq)
 {
-	return 0;//(int)(dpaa2_dq_flags(dq) & DPAA2_DQ_STAT_EXPIRED);
+	return (int)(qbman_result_DQ_flags(dq) & DPAA2_DQ_STAT_EXPIRED);
 }
 
 /**
