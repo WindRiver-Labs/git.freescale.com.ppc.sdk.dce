@@ -614,7 +614,8 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 #define atomic_sub_and_test(i, v) (atomic_sub_return(i, v) == 0)
 
 /* Place holder until a real vfio setup is established */
-#define vfio_alloc(s, a) vfio_setup_dma(0xA000)
+#define vfio_alloc(s, a) vfio_setup_dma(s < 0xA000 ? 0xA000 : \
+					s & 0xFFFFFFFFFFFFF000)
 #define vfio_free(x)
 
 struct work_struct;

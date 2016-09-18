@@ -49,7 +49,7 @@
 
 #define LDPAA_DCE_DESCRIPTION "Freescale LDPAA DCE Driver"
 
-#define DQ_STORE_SIZE	16
+#define DQ_STORE_SIZE 8192
 
 #define CONFIG_FSL_DCE_FLOW_LIMIT 65535
 
