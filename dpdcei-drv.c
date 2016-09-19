@@ -226,7 +226,7 @@ static int dpaa2_dce_pull_dequeue_rx(struct dpdcei_priv *priv)
 {
 	int err = 0;
 	int is_last = 0;
-	struct qbman_dq *dq;
+	struct dpaa2_dq *dq;
 	const struct dpaa2_fd *fd;
 	struct dce_flow *flow;
 	u32 key;

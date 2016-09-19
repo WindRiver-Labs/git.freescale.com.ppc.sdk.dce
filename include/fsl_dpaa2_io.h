@@ -356,9 +356,7 @@ u64 dpaa2_dq_fqd_ctx(const struct dpaa2_dq *dq);
  */
 static inline const struct dpaa2_fd *dpaa2_dq_fd(const struct dpaa2_dq *dq)
 {
-	const uint32_t *p = qb_cl(dq);
-
-	return (const struct dpaa2_fd *)&p[8];
+	return (const struct dpaa2_fd *)&dq->dq.fd;
 }
 
 
