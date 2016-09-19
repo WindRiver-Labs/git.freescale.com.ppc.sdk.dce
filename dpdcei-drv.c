@@ -404,6 +404,10 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	memset(&rx_attr, 0, sizeof(rx_attr));
 	memset(&tx_attr, 0, sizeof(tx_attr));
 
+	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
+	appease_mc(mc_io, dprc_id, dpio_id);
+	pr_info("Appeased mc\n");
+
 	priv = malloc(sizeof(*priv));
 	if (!priv) {
 		pr_err("Unable to allocate memory for dpdcei setup\n");
@@ -417,10 +421,6 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 
 	/* in flight ring initialization */
 	atomic_set(&priv->frames_in_flight, 0);
-
-	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
-	appease_mc(mc_io, dprc_id, dpio_id);
-	pr_info("Appeased mc\n");
 
 	/* get a handle for the DPDCEI this interface is associated with */
 	cfg = (struct dpdcei_cfg){.engine = engine, .priority = 1};
@@ -512,6 +512,11 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	err = dpdcei_dpio_service_setup(priv);
 	if (err)
 		goto err_dpio_setup;
+
+	if (priv->notif_ctx_rx.dpio_id != dpio_id) {
+		pr_err("discrepancy between expected and observed dpio id. Applying workaround\n");
+		priv->notif_ctx_rx.dpio_id = dpio_id;
+	}
 
 	/* DPDCEI binding to DPIO */
 	err = dpdcei_bind_dpio(priv, mc_io, priv->token);
