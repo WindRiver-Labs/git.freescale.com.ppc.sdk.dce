@@ -43,9 +43,12 @@ EXEC_PREFIX = $(DESTDIR)/usr/sbin
 
 HEADER_DEPENDENCIES = $(subst .o,.d,$(OBJS))
 
-all: dce_test
+all: basic_dce_test basic_dce_perf
 
-dce_test: tests/dce_test.o libdce.a
+basic_dce_test: tests/dce_test.o libdce.a
+	$(CC) $(CFLAGS) $^ -o $@
+
+basic_dce_perf: tests/basic_dce_perf.o libdce.a
 	$(CC) $(CFLAGS) $^ -o $@
 
 libdce.a: $(OBJS)

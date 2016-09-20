@@ -286,7 +286,9 @@ static void fqdan_cb_rx(struct dpaa2_io_notification_ctx *ctx)
 {
 	struct dpdcei_priv *priv = container_of(ctx, struct dpdcei_priv,
 						   notif_ctx_rx);
+
 	dpaa2_dce_pull_dequeue_rx(priv);
+	dpaa2_io_service_rearm(priv->dpio_p, ctx);
 }
 
 static int __cold dpdcei_dpio_service_setup(struct dpdcei_priv *priv)
@@ -384,15 +386,18 @@ static void dpaa2_dce_free_store(struct dpdcei_priv *priv)
 
 static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id);
 
-static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engine)
+static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io,
+						struct dpaa2_io *dpio_p,
+						int dprc_id,
+						uint16_t root_dprc_token,
+						int dpio_id,
+						int engine)
 {
 	struct dprc_res_req res_req;
 	struct dpdcei_priv *priv = NULL;
 	struct dpdcei_rx_queue_attr rx_attr;
 	struct dpdcei_tx_queue_attr tx_attr;
 	struct dpdcei_cfg cfg;
-	uint16_t root_dprc_token;
-	int dprc_id, dpio_id;
 	int err = 0;
 
 	if (engine != DPDCEI_ENGINE_COMPRESSION &&
@@ -403,10 +408,6 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 
 	memset(&rx_attr, 0, sizeof(rx_attr));
 	memset(&tx_attr, 0, sizeof(tx_attr));
-
-	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
-	appease_mc(mc_io, dprc_id, dpio_id);
-	pr_info("Appeased mc\n");
 
 	priv = malloc(sizeof(*priv));
 	if (!priv) {
@@ -442,10 +443,6 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	vfio_force_rescan();
 
 	/* Associate dpdcei with dprc */
-	err = dprc_open(mc_io, MC_CMD_FLAG_PRI, ROOT_DPRC, &root_dprc_token);
-	if (err) {
-		pr_err("dprc_open() failed to open the root container\n");
-	}
 	strcpy(res_req.type, "dpdcei");
 	res_req.num = 1;
 	res_req.options = DPRC_RES_REQ_OPT_EXPLICIT | DPRC_RES_REQ_OPT_PLUGGED;
@@ -499,14 +496,12 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io, int engi
 	}
 	priv->tx_fqid = tx_attr.fqid;
 
-
 	/* dpio store */
 	err = dpaa2_dce_alloc_store(priv);
 	if (err)
 		goto err_get_attr;
 
-	/* Get dpio */
-	priv->dpio_p = dpaa2_io_create();
+	priv->dpio_p = dpio_p;
 
 	/* dpio services */
 	err = dpdcei_dpio_service_setup(priv);
@@ -552,6 +547,9 @@ static DEFINE_SPINLOCK(driver_lock);
 static int __cold dpdcei_drv_setup(void)
 {
 	struct fsl_mc_io *mc_io;
+	struct dpaa2_io *dpio_p;
+	int dprc_id, dpio_id;
+	uint16_t root_dprc_token;
 	int err = 0;
 
 	spin_lock(&driver_lock);
@@ -574,24 +572,33 @@ static int __cold dpdcei_drv_setup(void)
 	if (err)
 		goto err_mc_io_init;
 
-	compression = dpdcei_setup(mc_io, DPDCEI_ENGINE_COMPRESSION);
+	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
+	appease_mc(mc_io, dprc_id, dpio_id);
+	pr_info("Appeased mc\n");
+
+	/* Get dpio */
+	dpio_p = dpaa2_io_create();
+
+	err = dprc_open(mc_io, MC_CMD_FLAG_PRI, ROOT_DPRC, &root_dprc_token);
+	if (err) {
+		pr_err("dprc_open() failed to open the root container\n");
+	}
+
+	compression = dpdcei_setup(mc_io, dpio_p, dprc_id, root_dprc_token,
+					dpio_id, DPDCEI_ENGINE_COMPRESSION);
 	if (!compression) {
 		pr_err("Failed to setup compression dpdcei\n");
 		err = -EACCES;
 		goto err_comp_setup;
 	}
 
-	/* FIXME: this is a hack to avoid setup issues */
-	decompression = compression;
-
-#if 0
-	decompression = dpdcei_setup(mc_io, DPDCEI_ENGINE_DECOMPRESSION);
+	decompression = dpdcei_setup(mc_io, dpio_p, dprc_id, root_dprc_token,
+					dpio_id, DPDCEI_ENGINE_DECOMPRESSION);
 	if (!decompression) {
 		pr_err("Failed to setup decompression dpdcei\n");
 		err = -EACCES;
 		goto err_decomp_setup;
 	}
-#endif
 	return err;
 
 err_decomp_setup:

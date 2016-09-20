@@ -30,62 +30,77 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <compat.h>
 #include "dce-test-data.h"
 #include "../basic_dce.h"
 
-int main(void)
+
+#define pr_err(fmt, args...) do { \
+	printf("ERROR: "); \
+	printf(fmt, ##args); \
+} while (0)
+#define pr_info(fmt, args...) printf(fmt, ##args)
+
+static int dbg_lvl;
+
+#ifndef debug
+#define debug(level, fmt, args...) \
+({ \
+	/* use printf instead of pr_err and pr_info because they do not \
+	 * print from threads other than main */ \
+	if (level <= dbg_lvl) { \
+		printf("Worker %s: ", GET_THREAD_NAME()); \
+		printf(fmt, ##args); \
+	} \
+})
+#endif
+
+#define SOFT_ASSERT
+#ifdef SOFT_ASSERT
+#define ASSERT(condition) \
+do { \
+	fflush(stdout); \
+	fflush(stderr); \
+	if (!(condition)) { \
+		printf("SCREAM! %s,%s,%s,line=%d, %s\n", #condition, \
+			__FILE__, __func__, __LINE__, \
+			GET_THREAD_NAME()); \
+	} \
+	fflush(stderr); \
+	fflush(stdout); \
+} while(0)
+#else /* SOFT_ASSERT */
+#define ASSERT(condition) \
+do { \
+	fflush(stdout); \
+	fflush(stderr); \
+	assert(condition); \
+} while(0)
+#endif /* SOFT_ASSERT */
+
+#define GET_THREAD_NAME() \
+({ \
+	/* 16 bytes including \0 is specified max Linux thread name */ \
+	static __thread char __thread_name[16]; \
+	int __err; \
+	__err = pthread_getname_np(pthread_self(), __thread_name, \
+			sizeof(__thread_name)); \
+	if (__err) { \
+		sprintf(__thread_name, strerror(__err)); \
+	} \
+	__thread_name; \
+})
+
+static inline uint64_t read_cntvct(void)
 {
-	dma_addr_t input;
-	dma_addr_t output;
-	size_t input_sz, output_sz, output_produced;
-	int ret;
+	uint64_t ret;
+	uint64_t ret_new, timeout = 200;
 
-	input_sz = dce_test_data_size;
-	input = dce_alloc(input_sz);
-	output_sz = input_sz * 2;
-	output = dce_alloc(output_sz);
-
-	/* Get input data from sample data file */
-	memcpy(input, dce_test_data, input_sz);
-
-	/* Compression */
-	ret = bdce_process_data(DCE_COMPRESSION,
-			input,
-			output,
-			input_sz,
-			output_sz,
-			&output_produced);
-	if (ret) {
-		printf("DCE returned error code %d\n", ret);
-		return -1;
+	asm volatile ("mrs %0, cntvct_el0" : "=r" (ret));
+	asm volatile ("mrs %0, cntvct_el0" : "=r" (ret_new));
+	while (ret != ret_new && timeout--) {
+		ret = ret_new;
+		asm volatile ("mrs %0, cntvct_el0" : "=r" (ret_new));
 	}
-	printf("Compressed %zu bytes into %zu bytes\n",
-			input_sz, output_produced);
-
-	/* Decompression */
-	memcpy(input, output, output_produced);
-
-	/* The bytes to decomp is equal to the comp output bytes */
-	input_sz = output_produced;
-
-	ret = bdce_process_data(DCE_DECOMPRESSION,
-			input,
-			output,
-			input_sz,
-			output_sz,
-			&output_produced);
-	if (ret) {
-		printf("DCE returned error code %d\n", ret);
-		return -1;
-	}
-	printf("Decompressed %zu bytes into %zu bytes\n",
-			input_sz, output_produced);
-
-	if (memcmp(dce_test_data, output, dce_test_data_size))
-		printf("Original input does NOT match decompressed data\n");
-	else
-		printf("Original input matches decompressed data\n");
-
-	return 0;
+	assert(timeout || ret == ret_new);
+	return ret;
 }

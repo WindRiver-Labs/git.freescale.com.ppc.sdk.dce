@@ -176,39 +176,15 @@ int bdce_process_data(enum dce_engine dce_mode,
 	unsigned long timeout;
 	void *hack_input, *hack_output;
 
-	if (dce < 0) {
-		/* no one initialized the dce yet. Attempt initialize */
-		ret = setup_dce();
-		if (ret < 0) {
-			/* maybe a different pthread already opened it. Take a
-			 * pause and check again */
-			/* ret = pthread_yield(); */
-			printf("attempt to open dce returned error code %d\n",
-					ret);
-			if (dce < 0)
-				/* no one was able to open the dce */
-				return -ret;
-		} else {
-			dce = ret;
-		}
-	}
-
 	session = dce_mode == DCE_COMPRESSION ?
 			&comp_session : &decomp_session;
-
-	/* FIXME: HACK to bypass bad dprc setup */
-	hack_input = vfio_alloc(input_len, 0);
-	assert(hack_input);
-	memcpy(hack_input, (void *)input, input_len);
-	hack_output = vfio_alloc(output_len, 0);
-	assert(hack_output);
 
 try_again:
 	work_unit.done = false;
 	sem_init(&work_unit.reply_wait, 0, 0);
 	ret = dce_process_data(session,
-		     hack_input,
-		     hack_output,
+		     input,
+		     output,
 		     input_len,
 		     output_len,
 		     DCE_Z_FINISH,
@@ -241,9 +217,6 @@ try_again:
 		goto err_timedout;
 	}
 
-	/* FIXME: hack to bypass bad dprc setup */
-	memcpy(output, hack_output, work_unit.output_produced);
-
 err_timedout:
 	*output_produced = work_unit.output_produced;
 err_enqueue:
@@ -252,5 +225,23 @@ err_enqueue:
 
 void *dce_alloc(size_t sz)
 {
+	int ret;
+	if (dce < 0) {
+		/* no one initialized the dce yet. Attempt initialize */
+		ret = setup_dce();
+		if (ret < 0) {
+			/* maybe a different pthread already opened it. Take a
+			 * pause and check again */
+			/* ret = pthread_yield(); */
+			printf("attempt to open dce returned error code %d\n",
+					ret);
+			if (dce < 0)
+				/* no one was able to open the dce */
+				return NULL;
+		} else {
+			dce = ret;
+		}
+	}
+
 	return vfio_alloc(sz, 0);
 }
