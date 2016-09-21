@@ -220,34 +220,8 @@ int dpaa2_io_service_acquire(struct dpaa2_io *d, u32 bpid,
  * suitably-sized (and aligned) memory for these entries.
  */
 
-struct __attribute__ ((__packed__)) dpaa2_dq {
-	u8 verb;
-	union {
-		u32 dont_manipulate_directly[16];
-		struct __attribute__ ((__packed__)) dq {
-			u8 stat;
-			u16 seqnum;
-			u16 oprid;
-			u8 reserved;
-			u8 tok;
-			u24 fqid;
-			u8 reserved2[5];
-			u32 fq_byte_cnt;
-			u24 fq_frm_cnt;
-			u8 reserved3;
-			u64 fqd_ctx;
-			u8 fd[32];
-		} dq;
-		struct __attribute__ ((__packed__)) scn {
-			u8 stat;
-			u8 state;
-			u8 reserved;
-			u24 rid;
-			u8 tok;
-			u64 ctx;
-			u8 reserved2[48];
-		} scn;
-	};
+struct dpaa2_dq {
+	u32 dont_manipulate_directly[16];
 };
 
 /* Parsing frame dequeue results */
@@ -356,7 +330,9 @@ u64 dpaa2_dq_fqd_ctx(const struct dpaa2_dq *dq);
  */
 static inline const struct dpaa2_fd *dpaa2_dq_fd(const struct dpaa2_dq *dq)
 {
-	return (const struct dpaa2_fd *)&dq->dq.fd;
+	const uint32_t *p = qb_cl(dq);
+
+	return (const struct dpaa2_fd *)&p[8];
 }
 
 

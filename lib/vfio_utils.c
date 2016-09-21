@@ -89,9 +89,6 @@ void* vfio_setup_dma(uint64_t dma_size)
 		perror("DMA map ioctl failed: ");
 		return NULL;
 	}
-	sleep(1);
-	printf("Mapped %lu bytes at vaddr %p\n", dma_size, (void*)dma_map.vaddr);
-	sleep(1);
 	return (void*) dma_map.vaddr;
 }
 
