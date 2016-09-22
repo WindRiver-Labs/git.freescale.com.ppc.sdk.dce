@@ -101,6 +101,7 @@ static inline struct bufinfo *get_bufinfo(struct dma_mem *map, int idx)
 void dma_mem_allocator_init(struct dma_mem *map)
 {
 	*get_numbufs(map) = 0;
+	pthread_mutex_init(&map->alloc_lock, NULL /*default mutex attribute */);
 	DPRINT("%s\n", __func__);
 	DUMP_LOCK(map);
 }
@@ -180,12 +181,12 @@ static void local_free(struct dma_mem *map, void *ptr)
 
 static inline int map_lock(struct dma_mem *map)
 {
-//	pthread_mutex_lock(&map->alloc_lock);
+	pthread_mutex_lock(&map->alloc_lock);
 	return 0;
 }
 static inline int map_unlock(struct dma_mem *map)
 {
-//	pthread_mutex_unlock(&map->alloc_lock);
+	pthread_mutex_unlock(&map->alloc_lock);
 	return 0;
 }
 

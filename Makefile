@@ -13,6 +13,7 @@ OBJS = dce.o \
        lib/dpio.o \
        lib/dpdcei.o \
        lib/vfio_utils.o \
+       lib/allocator.o \
        lib/qbman_debug.o \
        lib/qbman_portal.o \
        lib/dpio_service.o \

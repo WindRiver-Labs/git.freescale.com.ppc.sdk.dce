@@ -133,6 +133,15 @@ int dce_flow_create(struct dpdcei_priv *device, struct dce_flow *flow)
 	/* associate flow to device */
 	flow->device = device;
 
+	/* Setup dma memory for the flow */
+	flow->mem.addr = vfio_setup_dma(MAX_RESOURCE_IN_FLIGHT);
+	if (!flow->mem.addr) {
+		err = -ENOMEM;
+		goto err_dma_mem_setup;
+	}
+	flow->mem.sz = MAX_RESOURCE_IN_FLIGHT;
+	dma_mem_allocator_init(&flow->mem);
+
 	flow->flc.len = sizeof(struct fcr);
 	flow->flc.virt = vfio_alloc(sizeof(struct fcr), FCR_ALIGN);
 	if (!flow->flc.virt) {
@@ -151,8 +160,10 @@ int dce_flow_create(struct dpdcei_priv *device, struct dce_flow *flow)
 	return 0;
 
 err_get_table_entry:
-	vfio_free(flow->flc.virt);
+	dma_mem_free(&flow->mem, flow->flc.virt);
 err_fcr_alloc:
+	vfio_cleanup_dma(flow->mem.addr);
+err_dma_mem_setup:
 	return err;
 }
 EXPORT_SYMBOL(dce_flow_create);
@@ -163,7 +174,7 @@ int dce_flow_destroy(struct dce_flow *flow)
 	flow->flc.len = 0;
 
 	clear_flow_table_entry(flow, flow->key);
-	vfio_free(flow->flc.virt);
+	dma_mem_free(&flow->mem, flow->flc.virt);
 	flow->flc.virt = NULL;
 	return 0;
 }
@@ -561,8 +572,6 @@ static int __cold dpdcei_drv_setup(void)
 	/* it should never be that we have one engine and not the other */
 	assert(!compression && !decompression);
 
-	pr_info("dpdcei setup\n");
-
 	mc_io = malloc(sizeof(struct fsl_mc_io));
 	if (!mc_io) {
 		err = -ENOMEM;
@@ -574,7 +583,6 @@ static int __cold dpdcei_drv_setup(void)
 
 	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
 	appease_mc(mc_io, dprc_id, dpio_id);
-	pr_info("Appeased mc\n");
 
 	/* Get dpio */
 	dpio_p = dpaa2_io_create();

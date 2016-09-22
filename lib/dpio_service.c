@@ -134,7 +134,7 @@ static struct dprc_res_req res_req;
 static int root_container_id=1;
 static uint16_t token_dprc[2];
 static struct dprc_connection_cfg cfg_c_dprc;
-static struct dprc_cfg cfg_dprc; 
+static struct dprc_cfg cfg_dprc;
 char *id_str_dprc[20];
 int created_dprc_id;
 static uint64_t child_portal_paddr;
@@ -188,13 +188,8 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId) {
 
 void *process_interrupt(void *not_used)
 {
-	printf("Polling for interrupt\n");
 	while(1){
-		sleep(0.1);
 		if(qbman_swp_interrupt_read_status(obj->swp)) {
-			printf("Processing interrupt\n");
-			fflush(0);
-			sleep(1);
 			dpaa2_io_irq(obj);
 			count_interrupt++;
 		}
@@ -345,9 +340,7 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 
 	swp = obj->swp;
 	dq = qbman_swp_dqrr_next(swp);
-printf("qbman_swp_dqrr_next()\n");
 	while (dq) {
-printf("qbman_result_is_SCN()\n");
 		if (qbman_result_is_SCN(dq)) {
 			struct dpaa2_io_notification_ctx *ctx;
 			u64 q64;

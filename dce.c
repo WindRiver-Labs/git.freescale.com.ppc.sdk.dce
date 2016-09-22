@@ -121,7 +121,8 @@ static void trigger_user_callback(struct dce_session *session,
 				       input_consumed, output_produced,
 				       store->context);
 	}
-	vfio_free((unsigned char *)store - offsetof(struct work_unit, store));
+	dma_mem_free(&session->flow.mem, container_of(store, struct work_unit,
+								store));
 }
 
 /* internal_callback - this is the callback that gets triggered by the DCE flow.
@@ -167,12 +168,13 @@ static void internal_callback(struct dce_flow *flow, u32 cmd,
 
 static void free_dce_internals(struct dce_session *session)
 {
+	struct dma_mem *mem = &session->flow.mem;
 	if (session->pending_output.vaddr)
-		vfio_free(session->pending_output.vaddr);
+		dma_mem_free(mem, session->pending_output.vaddr);
 	if (session->history.vaddr)
-		vfio_free(session->history.vaddr);
+		dma_mem_free(mem, session->history.vaddr);
 	if (session->decomp_context.vaddr)
-		vfio_free(session->decomp_context.vaddr);
+		dma_mem_free(mem, session->decomp_context.vaddr);
 
 	session->pending_output.vaddr = session->history.vaddr =
 		session->decomp_context.vaddr = NULL;
@@ -184,23 +186,25 @@ static void free_dce_internals(struct dce_session *session)
 
 static int alloc_dce_internals(struct dce_session *session)
 {
+	struct dma_mem *mem = &session->flow.mem;
 	if (session->engine == DCE_COMPRESSION) {
 		session->pending_output.len = COMP_PENDING_OUTPUT_SZ;
-		session->pending_output.vaddr = vfio_alloc(
-			session->pending_output.len, PENDING_OUTPUT_ALIGN);
+		session->pending_output.vaddr = dma_mem_memalign(mem,
+			PENDING_OUTPUT_ALIGN, session->pending_output.len);
 		session->history.len = COMP_HISTORY_SZ;
-		session->history.vaddr = vfio_alloc(
-			session->history.len, HISTORY_ALIGN);
+		session->history.vaddr = dma_mem_memalign(mem,
+			 HISTORY_ALIGN, session->history.len);
 	} else if (session->engine == DCE_DECOMPRESSION) {
 		session->pending_output.len = DECOMP_PENDING_OUTPUT_SZ;
-		session->pending_output.vaddr = vfio_alloc(
-			session->pending_output.len, PENDING_OUTPUT_ALIGN);
+		session->pending_output.vaddr = dma_mem_memalign(mem,
+				PENDING_OUTPUT_ALIGN,
+				session->pending_output.len);
 		session->history.len = DECOMP_HISTORY_SZ;
-		session->history.vaddr = vfio_alloc(
-			session->history.len, HISTORY_ALIGN);
+		session->history.vaddr = dma_mem_memalign(mem,
+			HISTORY_ALIGN, session->history.len);
 		session->decomp_context.len = DECOMP_CONTEXT_SZ;
-		session->decomp_context.vaddr = vfio_alloc(
-			session->decomp_context.len, DECOMP_CONTEXT_ALIGN);
+		session->decomp_context.vaddr = dma_mem_memalign(mem,
+			DECOMP_CONTEXT_ALIGN, session->decomp_context.len);
 	}
 	if (!session->pending_output.vaddr || !session->history.vaddr ||
 			(!session->decomp_context.vaddr &&
@@ -299,7 +303,8 @@ int dce_process_frame(struct dce_session *session,
 		      void *context)
 {
 	struct dce_flow *flow = &session->flow;
-	struct work_unit *work_unit = vfio_alloc(sizeof(struct work_unit), 64);
+	struct work_unit *work_unit = dma_mem_memalign(&session->flow.mem,64,
+						sizeof(struct work_unit));
 	struct dpaa2_fd *fd_list;
 	struct dpaa2_fd *scf_fd;
 	int ret;

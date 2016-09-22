@@ -36,10 +36,11 @@
 
 #include "dce.h"
 
-/* this allocator is currently a place holder for a more efficient allocator
- * that will eliminate the need for copying input data to a kmalloc buf */
+/* 1000 MB default pool size available for dce_alloc. change this macro to
+ * desired size if 200MB is not suitable. Must be a 0x1000 aligned size */
+#define DCE_VFIO_CACHE_SZ 0x3E800000
 void *dce_alloc(size_t sz);
-#define dce_free(x)
+void dce_free(void *p);
 
 /**
  * dce_process_data() - Compress or decompress arbitrary data asynchronously

@@ -48,6 +48,7 @@
 #include <pthread.h>
 
 #include <vfio_utils.h>
+#include <allocator.h>
 #include "basic_dce.h"
 
 struct dma_item {
@@ -105,9 +106,11 @@ static void dce_callback(struct dce_session *session,
 	wake_up(&work_unit->reply_wait);
 }
 
+static struct dma_mem *dce_mem;
+
 static int setup_dce(void)
 {
-		struct dce_session_params params = {
+	struct dce_session_params params = {
 		.engine = DCE_COMPRESSION,
 		.paradigm = DCE_SESSION_STATELESS,
 		.compression_format = DCE_SESSION_CF_ZLIB,
@@ -134,12 +137,31 @@ static int setup_dce(void)
 
 	params.engine = DCE_DECOMPRESSION;
 	ret = dce_session_create(&decomp_session, &params);
-	if (ret) {
-		dce_session_destroy(&comp_session);
-		atomic_dec(&users);
-		return ret;
+	if (ret)
+		goto err_decomp_session_create;
+
+	dce_mem = malloc(sizeof(*dce_mem));
+	if (!dce_mem) {
+		ret = -ENOMEM;
+		goto err_dce_mem_alloc;
 	}
+	dce_mem->addr = vfio_setup_dma(DCE_VFIO_CACHE_SZ);
+	if (!dce_mem->addr) {
+		ret = -ENOMEM;
+		goto err_dce_mem_dma;
+	}
+	dce_mem->sz = DCE_VFIO_CACHE_SZ;
+	dma_mem_allocator_init(dce_mem);
 	return 0;
+
+err_dce_mem_dma:
+	free(dce_mem);
+err_dce_mem_alloc:
+	dce_session_destroy(&decomp_session);
+err_decomp_session_create:
+	dce_session_destroy(&comp_session);
+	atomic_dec(&users);
+	return ret;
 }
 
 static int cleanup_dce(void)
@@ -154,7 +176,6 @@ static int cleanup_dce(void)
 		pr_err("Failed to close DCE decompress session. ret = %d", ret);
 	return 0;
 }
-
 
 
 #define wait_event(x, c) \
@@ -174,7 +195,6 @@ int bdce_process_data(enum dce_engine dce_mode,
 	struct dce_session *session;
 	int ret = -ENOMEM, busy_count = 0;
 	unsigned long timeout;
-	void *hack_input, *hack_output;
 
 	session = dce_mode == DCE_COMPRESSION ?
 			&comp_session : &decomp_session;
@@ -226,6 +246,7 @@ err_enqueue:
 void *dce_alloc(size_t sz)
 {
 	int ret;
+
 	if (dce < 0) {
 		/* no one initialized the dce yet. Attempt initialize */
 		ret = setup_dce();
@@ -243,5 +264,10 @@ void *dce_alloc(size_t sz)
 		}
 	}
 
-	return vfio_alloc(sz, 0);
+	return dma_mem_memalign(dce_mem, 0 /* no align */, sz);
+}
+
+void dce_free(void *p)
+{
+	dma_mem_free(dce_mem, p);
 }

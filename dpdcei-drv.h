@@ -36,6 +36,7 @@
 #include <fsl_qbman_base.h>
 #include <fsl_dpdcei.h>
 #include <fsl_dpaa2_io.h>
+#include <allocator.h>
 #include "dce-fcr.h"
 
 struct dpdcei_priv {
@@ -74,6 +75,9 @@ struct dce_flow {
 	void (*cb)(struct dce_flow *, u32 cmd, const struct dpaa2_fd *fd);
 	struct dpdcei_priv *device;
 
+	/* flow dma memory map to keep driver related resources */
+	struct dma_mem mem;
+
 	/* flow memory: both virtual and dma memory */
 	struct flc_dma flc;
 	atomic_t frames_in_flight;
@@ -81,6 +85,18 @@ struct dce_flow {
 	u32 key;
 };
 
+/* This is a rough number used to preallocate a memory map for managing the flow
+ * and related resources. 320 is the size of the packaging needed to send a
+ * command to DCE. It includes things like the input fd, output fd and SCF
+ * storage and the SCF buffer. The 5000 is the maximum number of frames possible
+ * on real systems due to pfdr and sfdr memory size.
+ * the size must be  0x1000 aligned.
+ *
+ * Ideally this layer should not care or know about
+ * all of this, but passing this information down from the dce.h layer is ugly.
+ * In the future the hope is to create a dynamic allocator of dma able memory
+ * where the caller does not need to specify a specific map */
+#define MAX_RESOURCE_IN_FLIGHT ((320 * 50000) & ~0xFFF)
 int dce_flow_create(struct dpdcei_priv *dev, struct dce_flow *flow);
 int dce_flow_destroy(struct dce_flow *flow);
 

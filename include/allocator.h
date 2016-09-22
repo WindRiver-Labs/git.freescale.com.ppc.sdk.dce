@@ -30,6 +30,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __ALLOCATOR_H
+#define __ALLOCATOR_H
+
 #include <pthread.h>
 #include <stdint.h>
 
@@ -43,3 +46,5 @@ struct dma_mem {
 void dma_mem_allocator_init(struct dma_mem *mem);
 void *dma_mem_memalign(struct dma_mem *map, size_t align, size_t size);
 void dma_mem_free(struct dma_mem *map, void *ptr);
+
+#endif /* __ALLOCATOR_H */

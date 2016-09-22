@@ -6,6 +6,7 @@
 int vfio_setup(const char *drpc);
 
 void* vfio_setup_dma(uint64_t dma_size);
+#define vfio_cleanup_dma(p)
 
 #define PORTAL_MEM_CENA 0
 #define PORTAL_MEM_CINH 1
