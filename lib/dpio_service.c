@@ -243,10 +243,10 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 	atomic_set(&obj->refs, 1);
 	obj->swp_desc.cena_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CENA);
 	if(!obj->swp_desc.cena_bar)
-		return -1;
+		return NULL;
 	obj->swp_desc.cinh_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CINH);
 	if(!obj->swp_desc.cinh_bar)
-		return -1;
+		return NULL;
 	obj->swp_desc.idx = attr_dpio.id;
 	obj->swp_desc.eqcr_mode = qman_eqcr_vb_ring;
 	obj->swp_desc.irq = -1;
