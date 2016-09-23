@@ -433,7 +433,7 @@ static inline void dpaa2_sg_set_final(struct dpaa2_sg_entry *sg, bool final)
 static inline void dpaa2_sg_cpu_to_le(struct dpaa2_sg_entry *sg)
 {
 	u32 *p = (u32 *)sg;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < sizeof(*sg) / sizeof(u32); i++)
 		cpu_to_le32s(p++);
@@ -447,7 +447,7 @@ static inline void dpaa2_sg_cpu_to_le(struct dpaa2_sg_entry *sg)
 static inline void dpaa2_sg_le_to_cpu(struct dpaa2_sg_entry *sg)
 {
 	u32 *p = (u32 *)sg;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < sizeof(*sg) / sizeof(u32); i++)
 		le32_to_cpus(p++);

@@ -187,7 +187,7 @@ do { \
 	__p298->prev = __p298->next =__p298; \
 } while(0)
 #define list_entry(node, type, member) \
-	(type *)((void *)node - offsetof(type, member))
+	(type *)((u64)node - offsetof(type, member))
 #define list_empty(p) \
 ({ \
 	const struct list_head *__p298 = (p); \

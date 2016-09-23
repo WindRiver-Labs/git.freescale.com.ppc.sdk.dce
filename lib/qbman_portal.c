@@ -410,7 +410,7 @@ void qbman_eq_desc_set_dca(struct qbman_eq_desc *d, int enable,
 #define EQ_IDX(eqar)     ((eqar) & 0x7)
 #define EQ_VB(eqar)      ((eqar) & 0x80)
 #define EQ_SUCCESS(eqar) ((eqar) & 0x100)
-int qbman_swp_enqueue_array_mode(struct qbman_swp *s,
+static int qbman_swp_enqueue_array_mode(struct qbman_swp *s,
 				 const struct qbman_eq_desc *d,
 				 const struct qbman_fd *fd)
 {
@@ -438,7 +438,7 @@ static inline u8 qm_cyc_diff_test(u8 ringsize, u8 first, u8 last)
         return ringsize + last - first;
 }
 
-int qbman_swp_enqueue_ring_mode(struct qbman_swp *s,
+static int qbman_swp_enqueue_ring_mode(struct qbman_swp *s,
 				const struct qbman_eq_desc *d,
 				const struct qbman_fd *fd)
 {
@@ -562,11 +562,13 @@ void qbman_pull_desc_set_numframes(struct qbman_pull_desc *d, uint8_t numframes)
 				(uint32_t)(numframes - 1));
 }
 
+/*
 void qbman_pull_desc_set_token(struct qbman_pull_desc *d, uint8_t token)
 {
 	uint32_t *cl = qb_cl(d);
 	qb_attr_code_encode(&code_pull_token, cl, token);
 }
+*/
 
 void qbman_pull_desc_set_fq(struct qbman_pull_desc *d, uint32_t fqid)
 {

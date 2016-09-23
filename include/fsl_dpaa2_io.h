@@ -39,6 +39,7 @@ struct dpaa2_io;
 struct dpaa2_io_store;
 struct device;
 
+
 /**
  * DOC: DPIO Service Management
  *
@@ -121,6 +122,8 @@ struct dpaa2_io_desc {
 	u32 qman_version;
 };
 
+int dpaa2_io_get_dpio(int *rcId, int *dpioId);
+
 struct dpaa2_io *dpaa2_io_create(const int dpio_id);
 
 void dpaa2_io_down(struct dpaa2_io *d);
@@ -128,6 +131,29 @@ void dpaa2_io_down(struct dpaa2_io *d);
 int dpaa2_io_get_descriptor(struct dpaa2_io *obj, struct dpaa2_io_desc *desc);
 
 int dpaa2_io_irq(struct dpaa2_io *obj);
+
+struct dpaa2_io {
+        atomic_t refs;
+        struct dpaa2_io_desc dpio_desc;
+        struct qbman_swp_desc swp_desc;
+        struct qbman_swp *swp;
+        struct list_head node;
+
+	/*
+	* As part of simplifying assumptions, we provide an
+	* irq-safe lock for each type of DPIO operation that
+	* isn't innately lockless. The selection algorithms
+	* (which are simplified) require this, whereas
+	* eventually adherence to cpu-affinity will presumably
+	* relax the locking requirements.
+	*/
+        pthread_mutex_t lock_mgmt_cmd;
+
+        /* Protect the list of notifications */
+        pthread_mutex_t lock_notifications;
+
+        struct list_head notifications;
+};
 
 /* Notification handling */
 

@@ -35,9 +35,10 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
 #include <libgen.h>
 #include <stdlib.h>
+#include <sched.h>
+#include <pthread.h>
 
 #include "fsl_mc_cmd.h"
 #include "fsl_dpci.h"
@@ -54,14 +55,16 @@
 #include "fsl_dpio.h"
 #include "fsl_qbman_base.h"
 #include "qbman_debug.h"
-#include "needToFix.h"
 #include "compat.h"
-#include <pthread.h>
 
 #define PTR_ALIGN(p, a)            ((typeof(p))ALIGN((unsigned long)(p), (a)))
 #define FIRST_DPIO_STASH 4
 
 #define INTERRUPT_POLLING_INTERVAL 100
+
+#define NR_CPUS 8
+#define LIST_HEAD_INIT(name) { &(name), &(name) }
+#define PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP { { 0, 0, 0, PTHREAD_MUTEX_ADAPTIVE_NP, { 0, 0, 0, 0 }, 0, { 0 }, 0, 0 } }
 
 extern struct dpaa2_io *devObjPtr;
 
@@ -87,7 +90,6 @@ static DEFINE_SPINLOCK(dpio_list_lock) ;
 /**********************/
 /* Internal functions */
 /**********************/
-#include <sched.h>
 static inline struct dpaa2_io *service_select_by_cpu(struct dpaa2_io *d,
 						     int cpu)
 {
@@ -96,8 +98,9 @@ static inline struct dpaa2_io *service_select_by_cpu(struct dpaa2_io *d,
 	/* If cpu==-1, choose the current cpu, with no guarantees about
 	 * potentially being migrated away.
 	 */
-	if (unlikely(cpu < 0))
+	if (unlikely(cpu < 0)) {
 		cpu = sched_getcpu();
+	}
 
 	/* If a specific cpu was requested, pick it up immediately */
 	return dpio_by_cpu[cpu];
@@ -116,6 +119,16 @@ static inline struct dpaa2_io *service_select(struct dpaa2_io *d)
 	return d;
 }
 
+static void *process_interrupt(void *not_used)
+{
+	while(1){
+		usleep(INTERRUPT_POLLING_INTERVAL);
+		if(qbman_swp_interrupt_read_status(obj->swp)) {
+			dpaa2_io_irq(obj);
+		}
+	}
+	return NULL;
+}
 
 /**********************/
 /* Exported functions */
@@ -136,37 +149,48 @@ static struct dpio_cfg cfg_dpio;
 static struct dpio_attr attr_dpio;
 static char id_str_dpio[20];
 
-int dpaa2_io_get_dpio(int *rcId, int *dpioId) {
+int dpaa2_io_get_dpio(int *rcId, int *dpioId)
+{
 	/* MC */
-	assert(!mc_io_init(&mc_io));
-        assert(!dprc_open(&mc_io,NULL, root_container_id, &token_dprc[0]));
+	if(mc_io_init(&mc_io))
+		return -1;
+        if(dprc_open(&mc_io,0, root_container_id, &token_dprc[0]))
+		return -1;
 
         /* RC */
         cfg_dprc.icid = DPRC_GET_ICID_FROM_POOL;
         cfg_dprc.portal_id = DPRC_GET_PORTAL_ID_FROM_POOL;
         cfg_dprc.options = DPRC_CFG_OPT_TOPOLOGY_CHANGES_ALLOWED;
         strncpy(cfg_dprc.label, "dprc", 16);
-        assert(!dprc_create_container(&mc_io,NULL, token_dprc[0], &cfg_dprc, &created_dprc_id, &child_portal_paddr));
+        if(dprc_create_container(&mc_io,0, token_dprc[0], &cfg_dprc, &created_dprc_id, &child_portal_paddr))
+		return -1;
         sprintf(id_str_dprc, "dprc.%i", created_dprc_id);
         printf("Created DPRC: %x\n", created_dprc_id);
 
-        assert(!dprc_open(&mc_io,NULL, created_dprc_id, &token_dprc[1]));
+        if(dprc_open(&mc_io,0, created_dprc_id, &token_dprc[1]))
+		return -1;
         vfio_force_rescan();
 
 	/* DPIO */
         cfg_dpio.channel_mode =1; cfg_dpio.num_priorities =8;
-        assert(!dpio_create(&mc_io,NULL, &cfg_dpio, &token_dpio));
+        if(dpio_create(&mc_io,0, &cfg_dpio, &token_dpio))
+		return -1;
         vfio_force_rescan();
-        assert(!dpio_get_attributes(&mc_io,NULL, token_dpio, &attr_dpio));
-        assert(!dpio_close(&mc_io,NULL, token_dpio));
+        if(dpio_get_attributes(&mc_io,0, token_dpio, &attr_dpio))
+		return -1;
+        if(dpio_close(&mc_io,0, token_dpio))
+		return -1;
         vfio_force_rescan();
         strcpy(res_req.type, "dpio"); res_req.num =1; res_req.options =DPRC_RES_REQ_OPT_EXPLICIT | DPRC_RES_REQ_OPT_PLUGGED;
 
         res_req.id_base_align =attr_dpio.id;
-        assert(!dprc_assign(&mc_io,NULL, token_dprc[0], created_dprc_id, &res_req));
+        if(dprc_assign(&mc_io,0, token_dprc[0], created_dprc_id, &res_req))
+		return -1;
         vfio_force_rescan();
-        assert(!dpio_open(&mc_io,NULL, attr_dpio.id, &token_dpio));
-        assert(!dpio_set_stashing_destination(&mc_io,NULL, token_dpio, FIRST_DPIO_STASH));
+        if(dpio_open(&mc_io,0, attr_dpio.id, &token_dpio))
+		return -1;
+        if(dpio_set_stashing_destination(&mc_io,0, token_dpio, FIRST_DPIO_STASH))
+		return -1;
         sprintf(id_str_dpio, "dpio.%i", attr_dpio.id);
         printf("Created: %s\n", id_str_dpio);
 
@@ -174,16 +198,6 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId) {
 	*rcId = created_dprc_id;
 
 	return attr_dpio.id;
-}
-
-void *process_interrupt(void *not_used)
-{
-	while(1){
-		usleep(INTERRUPT_POLLING_INTERVAL);
-		if(qbman_swp_interrupt_read_status(obj->swp)) {
-			dpaa2_io_irq(obj);
-		}
-	}
 }
 
 /**
@@ -228,9 +242,11 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 
 	atomic_set(&obj->refs, 1);
 	obj->swp_desc.cena_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CENA);
-	assert(obj->swp_desc.cena_bar);
+	if(!obj->swp_desc.cena_bar)
+		return -1;
 	obj->swp_desc.cinh_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CINH);
-	assert(obj->swp_desc.cinh_bar);
+	if(!obj->swp_desc.cinh_bar)
+		return -1;
 	obj->swp_desc.idx = attr_dpio.id;
 	obj->swp_desc.eqcr_mode = qman_eqcr_vb_ring;
 	obj->swp_desc.irq = -1;
@@ -325,7 +341,7 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 	swp = obj->swp;
 	status = qbman_swp_interrupt_read_status(swp);
 	if (!status)
-		return NULL;
+		return 0;
 
 	swp = obj->swp;
 	dq = qbman_swp_dqrr_next(swp);
@@ -589,6 +605,7 @@ int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
 				u32 fqid,
 				const struct dpaa2_fd *fd)
 {
+	int res;
 	struct qbman_eq_desc ed;
 
 	d = service_select(d);
@@ -597,7 +614,10 @@ int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
 	qbman_eq_desc_clear(&ed);
 	qbman_eq_desc_set_no_orp(&ed, 0);
 	qbman_eq_desc_set_fq(&ed, fqid);
-	return qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
+	pthread_mutex_lock(&d->lock_mgmt_cmd);
+	res = qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
+	pthread_mutex_unlock(&d->lock_mgmt_cmd);
+	return res;
 }
 EXPORT_SYMBOL(dpaa2_io_service_enqueue_fq);
 
@@ -626,6 +646,7 @@ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
 				u32 qdid, u8 prio, u16 qdbin,
 				const struct dpaa2_fd *fd)
 {
+	int res;
 	struct qbman_eq_desc ed;
 
 	d = service_select(d);
@@ -634,7 +655,10 @@ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
 	qbman_eq_desc_clear(&ed);
 	qbman_eq_desc_set_no_orp(&ed, 0);
 	qbman_eq_desc_set_qd(&ed, qdid, qdbin, prio);
-	return qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
+	pthread_mutex_lock(&d->lock_mgmt_cmd);
+	res = qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
+	pthread_mutex_unlock(&d->lock_mgmt_cmd);
+	return res;
 }
 EXPORT_SYMBOL(dpaa2_io_service_enqueue_qd);
 
@@ -720,7 +744,7 @@ struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
 	size = max_frames * sizeof(struct dpaa2_dq);
 
 	ret->vaddr = vfio_setup_dma(size);
-	ret->paddr = ret->vaddr;
+	ret->paddr = (u64)ret->vaddr;
 
 	ret->idx = 0;
 	ret->dev = dev;

@@ -127,9 +127,9 @@ struct qbman_swp_sys {
 	 * marshalled from these allocated areas using QBMan's "MC access
 	 * registers". CINH accesses are atomic so there's no need for a
 	 * place-holder. */
-	void *cena;
-	void __iomem *addr_cena;
-	void __iomem *addr_cinh;
+	u64 cena;
+	u64 addr_cena;
+	u64 addr_cinh;
 	uint32_t idx;
 	enum qbman_eqcr_mode eqcr_mode;
 };
@@ -166,7 +166,7 @@ static inline uint32_t qbman_cinh_read(struct qbman_swp_sys *s, uint32_t offset)
 static inline void *qbman_cena_write_start(struct qbman_swp_sys *s,
 						uint32_t offset)
 {
-	void *shadow = s->cena + offset;
+	void *shadow = (void *) (s->cena + offset);
 
 #ifdef QBMAN_CENA_TRACE
 	pr_info("qbman_cena_write_start(%p:%d:0x%03x) %p\n",
@@ -185,7 +185,7 @@ static inline void *qbman_cena_write_start_wo_shadow(struct qbman_swp_sys *s,
 		s->addr_cena, s->idx, offset);
 #endif
 	BUG_ON(offset & 63);
-	return (s->addr_cena + offset);
+	return (void *)(s->addr_cena + offset);
 }
 
 static inline void qbman_cena_write_complete(struct qbman_swp_sys *s,
@@ -225,7 +225,7 @@ static inline uint32_t qbman_cena_read_reg(struct qbman_swp_sys *s,
 
 static inline void *qbman_cena_read(struct qbman_swp_sys *s, uint32_t offset)
 {
-	uint32_t *shadow = s->cena + offset;
+	uint32_t *shadow = (uint32_t *)(s->cena + offset);
 	unsigned int loop;
 #ifdef QBMAN_CENA_TRACE
 	pr_info("qbman_cena_read(%p:%d:0x%03x) %p\n",
@@ -252,7 +252,7 @@ static inline void *qbman_cena_read_wo_shadow(struct qbman_swp_sys *s,
 #ifdef QBMAN_CENA_TRACE
 	hexdump(shadow, 64);
 #endif
-	return s->addr_cena + offset;
+	return (void *)(s->addr_cena + offset);
 }
 
 static inline void qbman_cena_invalidate(struct qbman_swp_sys *s,
@@ -265,13 +265,13 @@ static inline void qbman_cena_invalidate_prefetch(struct qbman_swp_sys *s,
 						  uint32_t offset)
 {
 	dccivac(s->addr_cena + offset);
-	prefetch_for_load(s->addr_cena + offset);
+	prefetch_for_load((void*)(s->addr_cena + offset));
 }
 
 static inline void qbman_cena_prefetch(struct qbman_swp_sys *s,
 				       uint32_t offset)
 {
-	prefetch_for_load(s->addr_cena + offset);
+	prefetch_for_load((void*)(s->addr_cena + offset));
 }
 
 	/******************/
@@ -316,10 +316,10 @@ static inline int qbman_swp_sys_init(struct qbman_swp_sys *s,
 				     uint8_t dqrr_size)
 {
 	uint32_t reg;
-	s->addr_cena = d->cena_bar;
-	s->addr_cinh = d->cinh_bar;
+	s->addr_cena = (u64)d->cena_bar;
+	s->addr_cinh = (u64)d->cinh_bar;
 	s->idx = (uint32_t)d->idx;
-	s->cena = (void *)get_zeroed_page(GFP_KERNEL);
+	s->cena = (u64)get_zeroed_page(GFP_KERNEL);
 	if (!s->cena) {
 		pr_err("Could not allocate page for cena shadow\n");
 		return -1;
@@ -344,7 +344,7 @@ static inline int qbman_swp_sys_init(struct qbman_swp_sys *s,
 	reg = qbman_cinh_read(s, QBMAN_CINH_SWP_CFG);
 	if (!reg) {
 		pr_err("The portal %d is not enabled!\n", s->idx);
-		kfree(s->cena);
+		kfree((void *)s->cena);
 		return -1;
 	}
 	return 0;
