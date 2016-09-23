@@ -20,7 +20,7 @@ OBJS = dce.o \
        dce-scf-compression.o \
        dce-scf-decompression.o \
        dpdcei-drv.o \
-       dce-userspace.o
+       basic_dce.o
 
 CFLAGS = -Iinclude \
 	 -g3 \
@@ -46,7 +46,7 @@ HEADER_DEPENDENCIES = $(subst .o,.d,$(OBJS))
 
 all: basic_dce_test basic_dce_perf
 
-basic_dce_test: tests/dce_test.o libdce.a
+basic_dce_test: tests/basic_dce_test.o libdce.a
 	$(CC) $(CFLAGS) $^ -o $@
 
 basic_dce_perf: tests/basic_dce_perf.o libdce.a

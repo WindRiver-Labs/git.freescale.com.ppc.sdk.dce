@@ -335,7 +335,7 @@ int dce_process_frame(struct dce_session *session,
 	 * output were passed in with correct setup by our caller */
 
 	/* SCF */
-	dpaa2_sg_set_final((struct qbman_sg_entry *)scf_fd, 1);
+	dpaa2_sg_set_final((struct dpaa2_sg_entry *)scf_fd, 1);
 	dpaa2_fd_set_addr(scf_fd, (dma_addr_t) &work_unit->scf_result);
 	dpaa2_fd_set_len(scf_fd, sizeof(struct scf_c_cfg));
 	/* Set to recycle or truncate mode, don't need to do this every time for
