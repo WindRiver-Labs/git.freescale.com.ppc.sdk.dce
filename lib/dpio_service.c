@@ -29,13 +29,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <linux/types.h>
-//#include <linux/init.h>
-//#include <linux/module.h>
-//#include <linux/platform_device.h>
-//#include <linux/interrupt.h>
-//#include <linux/dma-mapping.h>
-//#include <linux/slab.h>
-//#include "mc.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -45,7 +38,6 @@
 #include <assert.h>
 #include <libgen.h>
 #include <stdlib.h>
-#include <semaphore.h>
 
 #include "fsl_mc_cmd.h"
 #include "fsl_dpci.h"
@@ -69,24 +61,23 @@
 #define PTR_ALIGN(p, a)            ((typeof(p))ALIGN((unsigned long)(p), (a)))
 #define FIRST_DPIO_STASH 4
 
+#define INTERRUPT_POLLING_INTERVAL 100
+
 extern struct dpaa2_io *devObjPtr;
 
 static pthread_t process_interrupt_thread;
-uint32_t count_interrupt=0;
 struct dpaa2_io *obj;
 static struct dpaa2_io_desc *desc;
 
-#ifdef toto
 struct dpaa2_io_store {
 	unsigned int max;
 	dma_addr_t paddr;
-	struct dpaa2_dq *vaddr;
+	struct qbman_result *vaddr;
 	void *alloced_addr; /* unaligned value from kmalloc() */
 	unsigned int idx; /* position of the next-to-be-returned entry */
 	struct qbman_swp *swp; /* portal used to issue VDQCR */
 	struct device *dev; /* device used for DMA mapping */
 };
-#endif
 
 /* keep a per cpu array of DPIOs for fast access */
 static struct dpaa2_io *dpio_by_cpu[NR_CPUS];
@@ -133,9 +124,8 @@ static inline struct dpaa2_io *service_select(struct dpaa2_io *d)
 static struct dprc_res_req res_req;
 static int root_container_id=1;
 static uint16_t token_dprc[2];
-static struct dprc_connection_cfg cfg_c_dprc;
 static struct dprc_cfg cfg_dprc;
-char *id_str_dprc[20];
+char id_str_dprc[20];
 int created_dprc_id;
 static uint64_t child_portal_paddr;
 
@@ -144,14 +134,14 @@ static struct fsl_mc_io mc_io;
 static uint16_t token_dpio;
 static struct dpio_cfg cfg_dpio;
 static struct dpio_attr attr_dpio;
-static char *id_str_dpio[20];
+static char id_str_dpio[20];
 
 int dpaa2_io_get_dpio(int *rcId, int *dpioId) {
-	// MC
+	/* MC */
 	assert(!mc_io_init(&mc_io));
         assert(!dprc_open(&mc_io,NULL, root_container_id, &token_dprc[0]));
 
-        // RC
+        /* RC */
         cfg_dprc.icid = DPRC_GET_ICID_FROM_POOL;
         cfg_dprc.portal_id = DPRC_GET_PORTAL_ID_FROM_POOL;
         cfg_dprc.options = DPRC_CFG_OPT_TOPOLOGY_CHANGES_ALLOWED;
@@ -163,7 +153,7 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId) {
         assert(!dprc_open(&mc_io,NULL, created_dprc_id, &token_dprc[1]));
         vfio_force_rescan();
 
-	// DPIO
+	/* DPIO */
         cfg_dpio.channel_mode =1; cfg_dpio.num_priorities =8;
         assert(!dpio_create(&mc_io,NULL, &cfg_dpio, &token_dpio));
         vfio_force_rescan();
@@ -189,9 +179,9 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId) {
 void *process_interrupt(void *not_used)
 {
 	while(1){
+		usleep(INTERRUPT_POLLING_INTERVAL);
 		if(qbman_swp_interrupt_read_status(obj->swp)) {
 			dpaa2_io_irq(obj);
-			count_interrupt++;
 		}
 	}
 }
@@ -208,7 +198,7 @@ void *process_interrupt(void *not_used)
  *
  * Return a valid dpaa2_io object for success, or NULL for failure.
  */
-struct dpaa2_io *dpaa2_io_create()//const struct dpaa2_io_desc *desc)
+struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 {
 	if (!desc)
 		desc = kmalloc(sizeof(*desc), GFP_KERNEL);
@@ -228,7 +218,7 @@ struct dpaa2_io *dpaa2_io_create()//const struct dpaa2_io_desc *desc)
 	 */
 	desc->regs_cena=0;
 	desc->regs_cinh=0;
-	desc->dpio_id=0;
+	desc->dpio_id=dpio_id;
 	desc->qman_version=QMAN_REV_4000;
 
 	if (!obj)
@@ -256,9 +246,9 @@ struct dpaa2_io *dpaa2_io_create()//const struct dpaa2_io_desc *desc)
 	spin_lock_init(&obj->lock_notifications);
 	INIT_LIST_HEAD(&obj->notifications);
 
-// This will cause: [ 1092.125040] arm-smmu 5000000.iommu: Unhandled context fault: iova=0x06030040, fsynr=0x12, cb=0
+	/* This will cause: [ 1092.125040] arm-smmu 5000000.iommu: Unhandled context fault: iova=0x06030040, fsynr=0x12, cb=0 */
 	/* For now only enable DQRR interrupts */
-//	qbman_swp_interrupt_set_trigger(obj->swp, QBMAN_SWP_INTERRUPT_DQRI);
+	/*	qbman_swp_interrupt_set_trigger(obj->swp, QBMAN_SWP_INTERRUPT_DQRI); */
 
 	qbman_swp_interrupt_clear_status(obj->swp, 0xffffffff);
 	if (obj->dpio_desc.receives_notifications)
@@ -274,7 +264,6 @@ struct dpaa2_io *dpaa2_io_create()//const struct dpaa2_io_desc *desc)
 		kfree(obj);
 		return NULL;
 	}
-	sem_t *sem = sem_open(SNAME, O_CREAT, 0644, 0);
 
 	return obj;
 }
@@ -328,7 +317,7 @@ EXPORT_SYMBOL(dpaa2_io_get_descriptor);
  */
 int dpaa2_io_irq(struct dpaa2_io *obj)
 {
-	const struct dpaa2_dq *dq;
+	const struct qbman_result *dq;
 	int max = 0;
 	struct qbman_swp *swp;
 	u32 status;
@@ -336,7 +325,7 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 	swp = obj->swp;
 	status = qbman_swp_interrupt_read_status(swp);
 	if (!status)
-		return NULL;//IRQ_NONE;
+		return NULL;
 
 	swp = obj->swp;
 	dq = qbman_swp_dqrr_next(swp);
@@ -357,9 +346,6 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 			goto done;
 		dq = qbman_swp_dqrr_next(swp);
 	}
-	sem_t *sem = sem_open(SNAME, 0);
-	sem_post(sem);
-	sem_close(sem);
 done:
 	qbman_swp_interrupt_clear_status(swp, status);
 	qbman_swp_interrupt_set_inhibit(swp, 0);
@@ -387,8 +373,6 @@ EXPORT_SYMBOL(dpaa2_io_irq);
 int dpaa2_io_service_register(struct dpaa2_io *d,
 			      struct dpaa2_io_notification_ctx *ctx)
 {
-	unsigned long irqflags;
-
 	d = service_select_by_cpu(d, ctx->desired_cpu);
 	if (!d)
 		return -ENODEV;
@@ -425,7 +409,6 @@ int dpaa2_io_service_deregister(struct dpaa2_io *service,
 				struct dpaa2_io_notification_ctx *ctx)
 {
 	struct dpaa2_io *d = ctx->dpio_private;
-	unsigned long irqflags;
 
 	if (ctx->is_cdan)
 		qbman_swp_CDAN_disable(d->swp, (u16)ctx->id);
@@ -454,7 +437,6 @@ EXPORT_SYMBOL(dpaa2_io_service_deregister);
 int dpaa2_io_service_rearm(struct dpaa2_io *d,
 			   struct dpaa2_io_notification_ctx *ctx)
 {
-	unsigned long irqflags;
 	int err;
 
 	d = service_select(d);
@@ -489,7 +471,6 @@ int dpaa2_io_from_registration(struct dpaa2_io_notification_ctx *ctx,
 {
 	struct dpaa2_io_notification_ctx *tmp;
 	struct dpaa2_io *d = ctx->dpio_private;
-	unsigned long irqflags;
 	int ret = 0;
 
 	/*
@@ -535,7 +516,6 @@ int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
 
 	qbman_pull_desc_clear(&pd);
 	qbman_pull_desc_set_storage(&pd, s->vaddr, s->paddr, 1);
-	//qbman_pull_desc_set_storage(&pd, NULL, NULL, 0);
 	qbman_pull_desc_set_numframes(&pd, (u8)s->max);
 	qbman_pull_desc_set_fq(&pd, fqid);
 	d = service_select(d);
@@ -617,7 +597,7 @@ int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
 	qbman_eq_desc_clear(&ed);
 	qbman_eq_desc_set_no_orp(&ed, 0);
 	qbman_eq_desc_set_fq(&ed, fqid);
-	return qbman_swp_enqueue(d->swp, &ed, fd);
+	return qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
 }
 EXPORT_SYMBOL(dpaa2_io_service_enqueue_fq);
 
@@ -654,7 +634,7 @@ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
 	qbman_eq_desc_clear(&ed);
 	qbman_eq_desc_set_no_orp(&ed, 0);
 	qbman_eq_desc_set_qd(&ed, qdid, qdbin, prio);
-	return qbman_swp_enqueue(d->swp, &ed, fd);
+	return qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
 }
 EXPORT_SYMBOL(dpaa2_io_service_enqueue_qd);
 
@@ -699,7 +679,6 @@ int dpaa2_io_service_acquire(struct dpaa2_io *d,
 			     u64 *buffers,
 			     unsigned int num_buffers)
 {
-	unsigned long irqflags;
 	int err;
 
 	d = service_select(d);
@@ -758,11 +737,12 @@ EXPORT_SYMBOL(dpaa2_io_store_create);
  */
 void dpaa2_io_store_destroy(struct dpaa2_io_store *s)
 {
-//	No way to destroy vfio_setup_dma?
-//	dma_unmap_single(s->dev, s->paddr, sizeof(struct dpaa2_dq) * s->max,
-//			 DMA_FROM_DEVICE);
-//	kfree(s->alloced_addr);
-//	kfree(s);
+/*	destroy vfio_setup_dma not implemented
+	dma_unmap_single(s->dev, s->paddr, sizeof(struct dpaa2_dq) * s->max,
+			 DMA_FROM_DEVICE);
+	kfree(s->alloced_addr);
+	kfree(s);
+*/
 }
 EXPORT_SYMBOL(dpaa2_io_store_destroy);
 
@@ -786,9 +766,9 @@ EXPORT_SYMBOL(dpaa2_io_store_destroy);
 struct dpaa2_dq *dpaa2_io_store_next(struct dpaa2_io_store *s, int *is_last)
 {
 	int match;
-	struct dpaa2_dq *ret = &s->vaddr[s->idx];
+	struct dpaa2_dq *ret = (struct dpaa2_dq *)&s->vaddr[s->idx];
 
-	match = qbman_result_has_new_result(s->swp, ret);
+	match = qbman_result_has_new_result(s->swp, (struct qbman_result *)ret);
 	if (!match) {
 		*is_last = 0;
 		return NULL;
@@ -802,7 +782,7 @@ struct dpaa2_dq *dpaa2_io_store_next(struct dpaa2_io_store *s, int *is_last)
 		 * vdqcr, return NULL to the caller rather than expecting him to
 		 * check non-NULL results every time.
 		 */
-		if (!(qbman_result_DQ_flags(ret) & DPAA2_DQ_STAT_VALIDFRAME))
+		if (!(qbman_result_DQ_flags((struct qbman_result *)ret) & DPAA2_DQ_STAT_VALIDFRAME))
 			ret = NULL;
 	} else {
 		*is_last = 0;
@@ -815,7 +795,6 @@ int dpaa2_io_query_fq_count(struct dpaa2_io *d, u32 fqid, u32 *fcnt, u32 *bcnt)
 {
 	struct qbman_attr state;
 	struct qbman_swp *swp;
-	unsigned long irqflags;
 	int ret;
 
 	d = service_select(d);
@@ -839,7 +818,6 @@ int dpaa2_io_query_bp_count(struct dpaa2_io *d, u32 bpid, u32 *num)
 {
 	struct qbman_attr state;
 	struct qbman_swp *swp;
-	unsigned long irqflags;
 	int ret;
 
 	d = service_select(d);

@@ -585,7 +585,7 @@ static int __cold dpdcei_drv_setup(void)
 	appease_mc(mc_io, dprc_id, dpio_id);
 
 	/* Get dpio */
-	dpio_p = dpaa2_io_create();
+	dpio_p = dpaa2_io_create(dpio_id);
 
 	err = dprc_open(mc_io, MC_CMD_FLAG_PRI, ROOT_DPRC, &root_dprc_token);
 	if (err) {

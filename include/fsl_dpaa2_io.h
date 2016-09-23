@@ -31,13 +31,9 @@
 #ifndef __FSL_DPAA2_IO_H
 #define __FSL_DPAA2_IO_H
 
-//#include <linux/types.h>
-//#include <linux/cpumask.h>
 #include "fsl_dpaa2_fd.h"
 #include "dpaa2_io_portal_priv.h"
 
-//#define SNAME "/var/local/io_service_sem"
-#define SNAME "/io_service_sem"
 
 struct dpaa2_io;
 struct dpaa2_io_store;
@@ -125,8 +121,7 @@ struct dpaa2_io_desc {
 	u32 qman_version;
 };
 
-struct dpaa2_io *dpaa2_io_create();//const struct dpaa2_io_desc *desc);
-//int dpaa2_io_create(int vfio_fd, struct dpaa2_intr_handle *intr_handle, struct qbman_swp *sw_portal);
+struct dpaa2_io *dpaa2_io_create(const int dpio_id);
 
 void dpaa2_io_down(struct dpaa2_io *d);
 
@@ -255,7 +250,7 @@ struct dpaa2_dq {
  */
 static inline int dpaa2_dq_is_pull(const struct dpaa2_dq *dq)
 {
-	return (int)(qbman_result_DQ_flags(dq) & DPAA2_DQ_STAT_VOLATILE);
+	return (int)(qbman_result_DQ_flags((const struct qbman_result *)dq) & DPAA2_DQ_STAT_VOLATILE);
 }
 
 /**
@@ -267,7 +262,7 @@ static inline int dpaa2_dq_is_pull(const struct dpaa2_dq *dq)
 static inline int dpaa2_dq_is_pull_complete(
 					const struct dpaa2_dq *dq)
 {
-	return (int)(qbman_result_DQ_flags(dq) & DPAA2_DQ_STAT_EXPIRED);
+	return (int)(qbman_result_DQ_flags((const struct qbman_result *)dq) & DPAA2_DQ_STAT_EXPIRED);
 }
 
 /**

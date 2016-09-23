@@ -29,13 +29,14 @@ struct dpaa2_io {
 	struct list_head notifications;
 };
 
+#ifdef toto
 struct dpaa2_io_store {
         unsigned int max;
         dma_addr_t paddr;
-        struct dpaa2_dq *vaddr;
+        struct qbman_result *vaddr;
         void *alloced_addr; /* unaligned value from kmalloc() */
         unsigned int idx; /* position of the next-to-be-returned entry */
         struct qbman_swp *swp; /* portal used to issue VDQCR */
         struct device *dev; /* device used for DMA mapping */
 };
-
+#endif
