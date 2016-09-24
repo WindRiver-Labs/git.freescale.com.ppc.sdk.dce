@@ -164,20 +164,6 @@ err_decomp_session_create:
 	return ret;
 }
 
-static int cleanup_dce(void)
-{
-	int ret;
-
-	ret = dce_session_destroy(&comp_session);
-	if (ret)
-		pr_err("Failed to close DCE compress session. ret = %d", ret);
-	ret = dce_session_destroy(&decomp_session);
-	if (ret)
-		pr_err("Failed to close DCE decompress session. ret = %d", ret);
-	return 0;
-}
-
-
 #define wait_event(x, c) \
 do { \
 	sem_wait(x); \
@@ -194,7 +180,6 @@ int bdce_process_data(enum dce_engine dce_mode,
 	struct work_unit work_unit;
 	struct dce_session *session;
 	int ret = -ENOMEM, busy_count = 0;
-	unsigned long timeout;
 
 	session = dce_mode == DCE_COMPRESSION ?
 			&comp_session : &decomp_session;
@@ -219,14 +204,6 @@ try_again:
 	}
 
 	wait_event(&work_unit.reply_wait, work_unit.done); /* wait callback */
-#if 0
-	timeout = wait_event_timeout(work_unit.reply_wait, work_unit.done,
-				msecs_to_jiffies(3500));
-	if (!timeout) {
-		pr_err("Error, didn't get expected callback\n");
-		goto err_timedout;
-	}
-#endif
 	if (work_unit.status == OUTPUT_BLOCKED_DISCARD) {
 		pr_err("The output buffer supplied was too small\n");
 		ret = work_unit.status;
