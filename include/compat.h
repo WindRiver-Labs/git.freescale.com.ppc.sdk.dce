@@ -151,7 +151,7 @@ do { \
 #undef pr_debug
 #endif
 #define pr_debug(fmt, args...)	do { ; } while(0)
-#define BUG_ON(c)		do { ; } while(0)
+#define BUG_ON(c)		do {(void)(c); } while(0)
 #define might_sleep_if(c)	do { ; } while(0)
 #define msleep(x)		do { ; } while(0)
 #endif
