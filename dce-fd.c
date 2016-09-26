@@ -296,15 +296,6 @@ u32 fd_attr_get_dd(struct fd_attr *d)
 }
 EXPORT_SYMBOL(fd_attr_get_dd);
 
-void fd_attr_get_flc_64_v2(struct fd_attr *d, u32 *hi, u32 *lo)
-{
-	u32 *p = ATTR32(d);
-
-	*hi = dce_attr_code_decode(&code_fd_flc_hi, p);
-	*lo = dce_attr_code_decode(&code_fd_flc_lo, p);
-}
-EXPORT_SYMBOL(fd_attr_get_flc_64_v2);
-
 void fd_attr_set_flc_64(struct fd_attr *d, uint64_t addr)
 {
 	const u32 *p = ATTR32(d);
@@ -327,7 +318,7 @@ EXPORT_SYMBOL(fd_attr_get_flc_64);
 void pretty_print_fd(struct fd_attr *d)
 {
 	pr_info("FD is\n");
-	pr_info("  ADDR = 0x%llx\n", fd_attr_get_addr_64(d));
+	pr_info("  ADDR = 0x%" PRIx64 "\n", fd_attr_get_addr_64(d));
 	if (fd_attr_get_sl(d)) {
 		pr_info("  DATA_LENGTH_18 = %u\n", fd_attr_get_data_len_18(d));
 		pr_info("  MEM = %u\n", fd_attr_get_mem(d));
@@ -352,7 +343,7 @@ void pretty_print_fd(struct fd_attr *d)
 	pr_info("  DROPP = %u\n", fd_attr_get_dropp(d));
 	pr_info("  SC = %u\n", fd_attr_get_sc(d));
 	pr_info("  DD = %u\n", fd_attr_get_dd(d));
-	pr_info("  FLC = 0x%llx\n", fd_attr_get_flc_64(d));
+	pr_info("  FLC = 0x%" PRIx64 "\n", fd_attr_get_flc_64(d));
 }
 EXPORT_SYMBOL(pretty_print_fd);
 
@@ -567,7 +558,7 @@ EXPORT_SYMBOL(fle_attr_get_flc_64);
 
 void pretty_print_fle(struct fle_attr *d)
 {
-	pr_info("  ADDR = 0x%llx\n", fle_attr_get_addr_64(d));
+	pr_info("  ADDR = 0x%" PRIx64 "\n", fle_attr_get_addr_64(d));
 	if (fle_attr_get_sl(d)) {
 		pr_info("  DATA_LENGTH_18 = %u\n", fle_attr_get_data_len_18(d));
 		pr_info("  MEM = %u\n", fle_attr_get_mem(d));
@@ -591,7 +582,7 @@ void pretty_print_fle(struct fle_attr *d)
 	pr_info("  PTV1 = %u\n", fle_attr_get_ptv1(d));
 	pr_info("  PTA = %u\n", fle_attr_get_pta(d));
 	pr_info("  FD_COMPAT_8 = %u\n", fle_attr_get_fd_compat_8(d));
-	pr_info("  FLC = 0x%llx\n", fle_attr_get_flc_64(d));
+	pr_info("  FLC = 0x%" PRIx64 "\n", fle_attr_get_flc_64(d));
 }
 EXPORT_SYMBOL(pretty_print_fle);
 
