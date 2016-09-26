@@ -18,4 +18,8 @@ void vfio_force_rescan(void);
 
 int vfio_bind_container(const char *dprc);
 
+int vfio_unbind_container(const char *dprc);
+
+int vfio_destroy_container(const char *dprc);
+
 #endif

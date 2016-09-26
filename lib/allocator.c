@@ -72,7 +72,7 @@ struct bufinfo {
 /* Return a pointer to <numbufs> */
 static inline uint32_t *get_numbufs(struct dma_mem *map)
 {
-	uint32_t *p = map->addr + map->sz;
+	uint32_t *p = (uint32_t *)((uint8_t *)map->addr + map->sz);
 	return &p[-1];
 }
 
@@ -154,7 +154,7 @@ static void *local_memalign(struct dma_mem *map, size_t align, size_t size)
 	buf->offset = lastend;
 	buf->len = size;
 	(*p_numbufs)++;
-	return map->addr + buf->offset;
+	return (uint8_t *)map->addr + buf->offset;
 }
 
 static void local_free(struct dma_mem *map, void *ptr)
