@@ -121,6 +121,7 @@ static inline struct dpaa2_io *service_select(struct dpaa2_io *d)
 
 static void *process_interrupt(void *not_used)
 {
+	(void)not_used; /* Silence compiler warning. Will be used in future */
 	while(1){
 		usleep(INTERRUPT_POLLING_INTERVAL);
 		if(qbman_swp_interrupt_read_status(obj->swp)) {
@@ -426,6 +427,7 @@ int dpaa2_io_service_deregister(struct dpaa2_io *service,
 {
 	struct dpaa2_io *d = ctx->dpio_private;
 
+	(void)service; /* Silence compiler warning. Will be used in future */
 	if (ctx->is_cdan)
 		qbman_swp_CDAN_disable(d->swp, (u16)ctx->id);
 	pthread_mutex_lock(&d->lock_notifications);
@@ -761,6 +763,7 @@ EXPORT_SYMBOL(dpaa2_io_store_create);
  */
 void dpaa2_io_store_destroy(struct dpaa2_io_store *s)
 {
+	(void)s; /* Silence compiler warning. Will be used in future */
 /*	destroy vfio_setup_dma not implemented
 	dma_unmap_single(s->dev, s->paddr, sizeof(struct dpaa2_dq) * s->max,
 			 DMA_FROM_DEVICE);
