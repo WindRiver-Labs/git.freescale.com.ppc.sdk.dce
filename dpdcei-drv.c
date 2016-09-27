@@ -579,7 +579,10 @@ static int __cold dpdcei_drv_setup(void)
 	if (err)
 		goto err_mc_io_init;
 
-	dpaa2_io_get_dpio(&dprc_id, &dpio_id);
+	err = dpaa2_io_get_dpio(&dprc_id, &dpio_id);
+	if (err)
+		goto err_mc_io_init;
+
 	appease_mc(mc_io, dprc_id, dpio_id);
 
 	/* Get dpio */
@@ -659,15 +662,12 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id) {
 	/* ***************************************** ENABLE IO */
 	assert(!dpio_enable(mc_io, 0, dpio_token));
 
-	/* dpio 9 SWP */
-	desc_swp.cena_bar = vfio_map_portal_mem(dpio_id_str, PORTAL_MEM_CENA);
-	assert(desc_swp.cena_bar);
-
+	desc_swp.cena_bar = 0;
 	desc_swp.cinh_bar = vfio_map_portal_mem(dpio_id_str, PORTAL_MEM_CINH);
 	assert(desc_swp.cinh_bar);
 
 	desc_swp.idx = dpio_id;
-	desc_swp.eqcr_mode = qman_eqcr_vb_ring;
+	desc_swp.eqcr_mode = qman_eqcr_vb_array;
 	desc_swp.irq = -1;
 	desc_swp.qman_version = QMAN_REV_4000;
 	dpio_swp = qbman_swp_init(&desc_swp);

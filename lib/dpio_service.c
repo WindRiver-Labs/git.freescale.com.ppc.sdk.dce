@@ -70,7 +70,6 @@ extern struct dpaa2_io *devObjPtr;
 
 static pthread_t process_interrupt_thread;
 struct dpaa2_io *obj;
-static struct dpaa2_io_desc *desc;
 
 struct dpaa2_io_store {
 	unsigned int max;
@@ -198,12 +197,11 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId)
 	*dpioId = attr_dpio.id;
 	*rcId = created_dprc_id;
 
-	return attr_dpio.id;
+	return 0;
 }
 
 /**
  * dpaa2_io_create() - create a dpaa2_io object.
- * @desc: the dpaa2_io descriptor
  *
  * Activates a "struct dpaa2_io" corresponding to the given config of an actual
  * DPIO object. This handle can be used on it's own (like a one-portal "DPIO
@@ -215,27 +213,6 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId)
  */
 struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 {
-	if (!desc)
-		desc = kmalloc(sizeof(*desc), GFP_KERNEL);
-	if (!desc)
-		return NULL;
-
-	/* non-zero iff the DPIO has a channel */
-	desc->receives_notifications=0;
-	/* ignored unless 'receives_notifications'. Non-zero iff the channel has
-	 * 8 priority WQs, otherwise the channel has 2.
-	 */
-	desc->has_8prio=0;
-	/* the cpu index that at least interrupt handlers will execute on. */
-	desc->cpu=sched_getcpu();
-	/* Caller-provided flags, determined by bus-scanning and/or creation of
-	 * DPIO objects via MC commands.
-	 */
-	desc->regs_cena=0;
-	desc->regs_cinh=0;
-	desc->dpio_id=dpio_id;
-	desc->qman_version=QMAN_REV_4000;
-
 	if (!obj)
 		obj = kmalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj)
@@ -249,7 +226,7 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 	if(!obj->swp_desc.cinh_bar)
 		return NULL;
 	obj->swp_desc.idx = attr_dpio.id;
-	obj->swp_desc.eqcr_mode = qman_eqcr_vb_ring;
+	obj->swp_desc.eqcr_mode = qman_eqcr_vb_array;
 	obj->swp_desc.irq = -1;
 	obj->swp_desc.qman_version = QMAN_REV_4000;
 	obj->swp = qbman_swp_init(&(obj->swp_desc));
@@ -258,6 +235,8 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 		kfree(obj);
 		return NULL;
 	}
+	obj->dpio_desc.dpio_id=dpio_id;
+
 	INIT_LIST_HEAD(&obj->node);
 	spin_lock_init(&obj->lock_mgmt_cmd);
 	spin_lock_init(&obj->lock_notifications);
@@ -271,10 +250,11 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 	if (obj->dpio_desc.receives_notifications)
 		qbman_swp_push_set(obj->swp, 0, 1);
 
+	int32_t cpu = sched_getcpu();
 	spin_lock(&dpio_list_lock);
 	list_add_tail(&obj->node, &dpio_list);
-	if (desc->cpu != -1 && !dpio_by_cpu[desc->cpu])
-		dpio_by_cpu[desc->cpu] = obj;
+	if (cpu != -1 && !dpio_by_cpu[cpu])
+		dpio_by_cpu[cpu] = obj;
 	spin_unlock(&dpio_list_lock);
 
 	if(pthread_create(&process_interrupt_thread, NULL, &process_interrupt, NULL)) {
@@ -616,9 +596,7 @@ int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
 	qbman_eq_desc_clear(&ed);
 	qbman_eq_desc_set_no_orp(&ed, 0);
 	qbman_eq_desc_set_fq(&ed, fqid);
-	pthread_mutex_lock(&d->lock_mgmt_cmd);
 	res = qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
-	pthread_mutex_unlock(&d->lock_mgmt_cmd);
 	return res;
 }
 EXPORT_SYMBOL(dpaa2_io_service_enqueue_fq);
@@ -657,9 +635,7 @@ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
 	qbman_eq_desc_clear(&ed);
 	qbman_eq_desc_set_no_orp(&ed, 0);
 	qbman_eq_desc_set_qd(&ed, qdid, qdbin, prio);
-	pthread_mutex_lock(&d->lock_mgmt_cmd);
 	res = qbman_swp_enqueue(d->swp, &ed, (const struct qbman_fd*)fd);
-	pthread_mutex_unlock(&d->lock_mgmt_cmd);
 	return res;
 }
 EXPORT_SYMBOL(dpaa2_io_service_enqueue_qd);
