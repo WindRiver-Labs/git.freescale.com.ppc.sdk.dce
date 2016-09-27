@@ -87,7 +87,8 @@ static void *worker_func(void *__context)
 	pthread_setname_np(context->pid, thread_name);
 	debug(3, "Worker %d at start line\n", context->idx);
 
-	output_sz = chunk_size * 2;
+	output_sz = context->mode == DCE_COMPRESSION ? chunk_size * 2 :
+							chunk_size * 15;
 	output = dce_alloc(output_sz);
 	context->total_in = 0;
 	context->total_out = 0;
@@ -102,7 +103,7 @@ static void *worker_func(void *__context)
 				output_sz,
 				&output_produced);
 		if (ret) {
-			debug(1, "DCE returned error code %d\n", ret);
+			debug(1, "DCE returned error code 0x%x\n", ret);
 			context->ret = ret;
 			pthread_exit(NULL);
 		}
@@ -228,7 +229,7 @@ int main(int argc, char *argv[])
 			struct chunk *new_chunk = malloc(sizeof(struct chunk));
 
 			new_chunk->addr = dce_alloc(bytes_in);
-			memcpy(new_chunk->addr, buf, bytes_in);
+			memcpy((void *)new_chunk->addr, buf, bytes_in);
 			new_chunk->size = bytes_in;
 			list_add_tail(&new_chunk->node, &chunk_list);
 			num_chunks++;
@@ -249,7 +250,7 @@ int main(int argc, char *argv[])
 				dce_test_data_size - (i * chunk_size) :
 				chunk_size;
 			new_chunk->addr = dce_alloc(new_chunk->size);
-			memcpy(new_chunk->addr, &dce_test_data[i * chunk_size],
+			memcpy((void *)new_chunk->addr, &dce_test_data[i * chunk_size],
 					new_chunk->size);
 			list_add_tail(&new_chunk->node, &chunk_list);
 		}

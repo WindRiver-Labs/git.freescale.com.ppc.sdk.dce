@@ -47,7 +47,7 @@ int main(void)
 	output = dce_alloc(output_sz);
 
 	/* Get input data from sample data file */
-	memcpy(input, dce_test_data, input_sz);
+	memcpy((void *)input, dce_test_data, input_sz);
 
 	/* Compression */
 	ret = bdce_process_data(DCE_COMPRESSION,
@@ -64,7 +64,7 @@ int main(void)
 			input_sz, output_produced);
 
 	/* Decompression */
-	memcpy(input, output, output_produced);
+	memcpy((void *)input, (void *)output, output_produced);
 
 	/* The bytes to decomp is equal to the comp output bytes */
 	input_sz = output_produced;
@@ -76,13 +76,13 @@ int main(void)
 			output_sz,
 			&output_produced);
 	if (ret) {
-		printf("DCE returned error code %d\n", ret);
+		pr_err("DCE returned error code 0x%x\n", ret);
 		return -1;
 	}
 	printf("Decompressed %zu bytes into %zu bytes\n",
 			input_sz, output_produced);
 
-	if (memcmp(dce_test_data, output, dce_test_data_size))
+	if (memcmp(dce_test_data, (void *)output, dce_test_data_size))
 		printf("Original input does NOT match decompressed data\n");
 	else
 		printf("Original input matches decompressed data\n");
