@@ -195,7 +195,7 @@ do { \
 	assert(c); \
 } while(0)
 
-int bdce_process_data(enum dce_engine dce_mode,
+int basic_dce_process_data(enum dce_engine dce_mode,
 		dma_addr_t input,
 		dma_addr_t output,
 		size_t input_len,

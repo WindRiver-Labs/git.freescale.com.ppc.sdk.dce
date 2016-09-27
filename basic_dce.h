@@ -39,7 +39,7 @@ dma_addr_t dce_alloc(size_t sz);
 void dce_free(dma_addr_t p);
 
 /**
- * dce_process_data() - Compress or decompress arbitrary data asynchronously
+ * basic_dce_process_data() - Compress or decompress data synchronously
  * @session:	Pointer to a session struct on which to send (de)compress
  *		requests
  * @input:	DMA address to input data, can be NULL if final input was
@@ -53,7 +53,7 @@ void dce_free(dma_addr_t p);
  * Return:	0 on success, dce -error code otherwise
  *
  */
-int bdce_process_data(enum dce_engine dce_mode,
+int basic_dce_process_data(enum dce_engine dce_mode,
 		dma_addr_t input,
 		dma_addr_t output,
 		size_t input_len,

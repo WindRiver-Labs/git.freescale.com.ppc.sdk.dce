@@ -50,7 +50,7 @@ int main(void)
 	memcpy((void *)input, dce_test_data, input_sz);
 
 	/* Compression */
-	ret = bdce_process_data(DCE_COMPRESSION,
+	ret = basic_dce_process_data(DCE_COMPRESSION,
 			input,
 			output,
 			input_sz,
@@ -69,7 +69,7 @@ int main(void)
 	/* The bytes to decomp is equal to the comp output bytes */
 	input_sz = output_produced;
 
-	ret = bdce_process_data(DCE_DECOMPRESSION,
+	ret = basic_dce_process_data(DCE_DECOMPRESSION,
 			input,
 			output,
 			input_sz,

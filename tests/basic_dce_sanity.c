@@ -100,7 +100,7 @@ static void *worker_func(void *__context)
 	/* Compression */
 	sync_all(); /* Wait at the start line */
 	list_for_each_entry(chunk, context->chunk_list, node) {
-		ret = bdce_process_data(context->mode,
+		ret = basic_dce_process_data(context->mode,
 				chunk->addr,
 				output,
 				chunk->size,
