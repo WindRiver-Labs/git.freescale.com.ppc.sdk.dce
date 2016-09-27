@@ -44,12 +44,15 @@ EXEC_PREFIX = $(DESTDIR)/usr/sbin
 
 HEADER_DEPENDENCIES = $(subst .o,.d,$(OBJS))
 
-all: basic_dce_test basic_dce_perf
+all: basic_dce_test basic_dce_perf basic_dce_sanity
 
 basic_dce_test: tests/basic_dce_test.o libdce.a
 	$(CC) $(CFLAGS) $^ -o $@
 
 basic_dce_perf: tests/basic_dce_perf.o libdce.a
+	$(CC) $(CFLAGS) $^ -o $@
+
+basic_dce_sanity: tests/basic_dce_sanity.o libdce.a
 	$(CC) $(CFLAGS) $^ -o $@
 
 libdce.a: $(OBJS)
@@ -64,7 +67,8 @@ install:
 clean:
 	rm -f $(OBJS) \
 	      $(HEADER_DEPENDENCIES) \
-	      dce_test
+	      basic_dce_test basic_dce_perf basic_dce_sanity \
+	      tests/*.o
 
 %.d: %.c
 	@($(CC) $(CFLAGS) -M $< | \
