@@ -67,7 +67,7 @@ install:
 clean:
 	rm -f $(OBJS) \
 	      $(HEADER_DEPENDENCIES) \
-	      basic_dce_test basic_dce_perf basic_dce_sanity \
+	      basic_dce_test basic_dce_perf basic_dce_sanity libdce.a\
 	      tests/*.o
 
 %.d: %.c

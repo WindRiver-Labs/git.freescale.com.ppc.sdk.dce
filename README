@@ -60,13 +60,7 @@ BIND dprc.7
 [ 6359.419749] vfio-fsl-mc dpio.13: Binding with vfio-fsl_mc driver
 VFIO group ID is 11
 Enable IO
-DMA map ioctl failed: : File exists
 DPDCEI: id=10, engine=COMPRESSION
-ERR:discrepancy between expected and observed dpio id. Applying workaround
 DPDCEI: id=11, engine=DECOMPRESSION
-ERR:discrepancy between expected and observed dpio id. Applying workaround
-Took us 1251521 for 50 ms delay. That is a freq of 25030420
-Took 3239728 us to process 3480540952 bytes, and output 689712834. CPU Cycles
-81091764. CPU frequency is 25030420
+Took 3239728 us to process 3480540952 bytes, and output 689712834 bytes
 Throughput is 8594 Mbps
-
