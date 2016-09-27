@@ -1678,7 +1678,7 @@ static unsigned char __maybe_unused dce_test_data[] = {
 	0x43, 0x46, 0x47, 0x0d
 };
 
-static size_t dce_test_data_size = sizeof(dce_test_data);
+static size_t __maybe_unused dce_test_data_size = sizeof(dce_test_data);
 
 #endif /* __DCE_TEST_DATA_H */
 

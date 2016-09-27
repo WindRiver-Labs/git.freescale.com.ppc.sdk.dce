@@ -33,13 +33,6 @@
 #include "dce-test-data.h"
 #include "../basic_dce.h"
 
-
-#define pr_err(fmt, args...) do { \
-	printf("ERROR: "); \
-	printf(fmt, ##args); \
-} while (0)
-#define pr_info(fmt, args...) printf(fmt, ##args)
-
 static int dbg_lvl;
 
 #ifndef debug
