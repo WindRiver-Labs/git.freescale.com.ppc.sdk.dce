@@ -105,6 +105,28 @@ static void dce_callback(struct dce_session *session,
 
 static struct dma_mem *dce_mem;
 
+static void cleanup_dce(void)
+{
+	int ret;
+
+	/* We have to cleanup, but can only do cleanup once because resources are
+	 * shared between threads */
+	if (!atomic_dec_and_test(&users))
+		return;
+
+	ret = dce_session_destroy(&comp_session);
+	if (ret)
+		pr_err("Failed to close DCE compress session. ret = %d", ret);
+	ret = dce_session_destroy(&decomp_session);
+	if (ret)
+		pr_err("Failed to close DCE decompress session. ret = %d", ret);
+
+	vfio_cleanup_dma(dce_mem->addr);
+	free(dce_mem);
+
+	dpdcei_drv_cleanup();
+}
+
 static int setup_dce(void)
 {
 	struct dce_session_params params = {
@@ -122,15 +144,12 @@ static int setup_dce(void)
 	};
 	int ret;
 
-	atomic_inc(&users);
-	if (atomic_read(&users) > 1)
+	if (atomic_read(&users) > 0)
 		return 0; /* No need to do anything, someone else did setup */
 
 	ret = dce_session_create(&comp_session, &params);
-	if (ret) {
-		atomic_dec(&users);
+	if (ret)
 		return ret;
-	}
 
 	params.engine = DCE_DECOMPRESSION;
 	ret = dce_session_create(&decomp_session, &params);
@@ -149,15 +168,24 @@ static int setup_dce(void)
 	}
 	dce_mem->sz = DCE_VFIO_CACHE_SZ;
 	dma_mem_allocator_init(dce_mem);
+
+	ret = atexit(cleanup_dce);
+	if (ret) {
+		goto err_dce_cleanup;
+	}
+
+	atomic_inc(&users);
+
 	return 0;
 
+err_dce_cleanup:
+	vfio_cleanup_dma(dma_mem->addr);
 err_dce_mem_dma:
 	free(dce_mem);
 err_dce_mem_alloc:
 	dce_session_destroy(&decomp_session);
 err_decomp_session_create:
 	dce_session_destroy(&comp_session);
-	atomic_dec(&users);
 	return ret;
 }
 
@@ -217,7 +245,7 @@ err_enqueue:
 	return ret;
 }
 
-void *dce_alloc(size_t sz)
+dma_addr_t dce_alloc(size_t sz)
 {
 	int ret;
 
@@ -232,16 +260,16 @@ void *dce_alloc(size_t sz)
 					ret);
 			if (dce < 0)
 				/* no one was able to open the dce */
-				return NULL;
+				return (dma_addr_t)NULL;
 		} else {
 			dce = ret;
 		}
 	}
 
-	return dma_mem_memalign(dce_mem, 0 /* no align */, sz);
+	return (dma_addr_t)dma_mem_memalign(dce_mem, 0 /* no align */, sz);
 }
 
-void dce_free(void *p)
+void dce_free(dma_addr_t p)
 {
-	dma_mem_free(dce_mem, p);
+	dma_mem_free(dce_mem, (void *)p);
 }

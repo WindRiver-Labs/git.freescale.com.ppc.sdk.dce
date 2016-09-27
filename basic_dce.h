@@ -35,8 +35,8 @@
 /* 1000 MB default pool size available for dce_alloc. change this macro to
  * desired size if 200MB is not suitable. Must be a 0x1000 aligned size */
 #define DCE_VFIO_CACHE_SZ 0x3E800000
-void *dce_alloc(size_t sz);
-void dce_free(void *p);
+dma_addr_t dce_alloc(size_t sz);
+void dce_free(dma_addr_t p);
 
 /**
  * dce_process_data() - Compress or decompress arbitrary data asynchronously
