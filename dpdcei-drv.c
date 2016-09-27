@@ -174,6 +174,8 @@ int dce_flow_destroy(struct dce_flow *flow)
 	clear_flow_table_entry(flow, flow->key);
 	dma_mem_free(&flow->mem, flow->flc.virt);
 	flow->flc.virt = NULL;
+	vfio_cleanup_dma(flow->mem.addr);
+	flow->mem.addr = NULL;
 	return 0;
 }
 EXPORT_SYMBOL(dce_flow_destroy);
@@ -672,3 +674,42 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id) {
 	desc_swp.qman_version = QMAN_REV_4000;
 	dpio_swp = qbman_swp_init(&desc_swp);
 }
+
+void dpdcei_drv_cleanup(void)
+{
+	int err;
+	struct fsl_mc_io *mc_io;
+
+	spin_lock(&driver_lock);
+	if (!compression || !decompression) {
+		spin_unlock(&driver_lock);
+		return;
+	}
+
+	assert(compression && decompression);
+	mc_io = compression->mc_dev;
+
+	err = dpdcei_disable(mc_io, MC_CMD_FLAG_PRI, compression->token);
+	if (err)
+		pr_err("error in %s in attempt to dpdcei_disable(comp)\n",
+				__func__);
+
+	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, compression->token);
+	if (err)
+		pr_err("error in %s in attempt to dpdcei_close(comp)\n",
+				__func__);
+
+	err = dpdcei_disable(mc_io, MC_CMD_FLAG_PRI, decompression->token);
+	if (err)
+		pr_err("error in %s in attempt to dpdcei_disable(decomp)\n",
+				__func__);
+
+	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, decompression->token);
+	if (err)
+		pr_err("error in %s in attempt to dpdcei_close(decomp)\n",
+				__func__);
+
+
+
+}
+EXPORT_SYMBOL(dpdcei_drv_cleanup);

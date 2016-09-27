@@ -62,6 +62,10 @@ struct dpdcei_priv {
 struct dpdcei_priv *get_compression_device(void);
 struct dpdcei_priv *get_decompression_device(void);
 
+/* Cleans up all dce resources. Must not be called before all DCE users in this
+ * process are finished using DCE */
+void dpdcei_drv_cleanup(void);
+
 struct flc_dma {
 	void *virt;
 	dma_addr_t phys;
