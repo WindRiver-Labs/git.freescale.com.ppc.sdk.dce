@@ -37,7 +37,7 @@
 #include <stdint.h>
 
 struct dma_mem {
-	void* addr;
+	void *addr;
 	size_t sz;
 	pthread_mutex_t alloc_lock;
 };

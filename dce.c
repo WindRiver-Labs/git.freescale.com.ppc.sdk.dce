@@ -167,6 +167,7 @@ static void internal_callback(struct dce_flow *flow, u32 cmd,
 static void free_dce_internals(struct dce_session *session)
 {
 	struct dma_mem *mem = &session->flow.mem;
+
 	if (session->pending_output.vaddr)
 		dma_mem_free(mem, session->pending_output.vaddr);
 	if (session->history.vaddr)
@@ -185,6 +186,7 @@ static void free_dce_internals(struct dce_session *session)
 static int alloc_dce_internals(struct dce_session *session)
 {
 	struct dma_mem *mem = &session->flow.mem;
+
 	if (session->engine == DCE_COMPRESSION) {
 		session->pending_output.len = COMP_PENDING_OUTPUT_SZ;
 		session->pending_output.vaddr = dma_mem_memalign(mem,
@@ -301,7 +303,7 @@ int dce_process_frame(struct dce_session *session,
 		      void *context)
 {
 	struct dce_flow *flow = &session->flow;
-	struct work_unit *work_unit = dma_mem_memalign(&session->flow.mem,64,
+	struct work_unit *work_unit = dma_mem_memalign(&session->flow.mem, 64,
 						sizeof(struct work_unit));
 	struct dpaa2_fd *fd_list;
 	struct dpaa2_fd *scf_fd;
@@ -362,6 +364,7 @@ int dce_process_frame(struct dce_session *session,
 	if (initial_frame) {
 		/* FIXME: CM and FLG should be setup differently for GZIP */
 		u8 CM, FLG;
+
 		fd_frc_set_uspc((struct fd_attr *)fd_list, true);
 		fd_frc_set_uhc((struct fd_attr *)fd_list, true);
 
@@ -372,28 +375,29 @@ int dce_process_frame(struct dce_session *session,
 			       effort, the 0 after indicates no dictionary, the
 			       01011 is the checksum for CM and FLG and must
 			       make CM_FLG a 16 bit number divisible by 31 */
-		scf_c_cfg_set_cm((struct scf_c_cfg *)&work_unit->scf_result, CM);
+		scf_c_cfg_set_cm((struct scf_c_cfg *)&work_unit->scf_result,
+									    CM);
 		scf_c_cfg_set_flg((struct scf_c_cfg *)&work_unit->scf_result,
 				FLG);
 		scf_c_cfg_set_next_flc(
-			(struct scf_c_cfg*)&work_unit->scf_result,
+			(struct scf_c_cfg *)&work_unit->scf_result,
 			(uint64_t)flow);
 		if (session->engine == DCE_COMPRESSION) {
 			scf_c_cfg_set_pending_output_ptr(
-				(struct scf_c_cfg*)&work_unit->scf_result,
+				(struct scf_c_cfg *)&work_unit->scf_result,
 				(dma_addr_t)session->pending_output.vaddr);
 			scf_c_cfg_set_history_ptr(
-				(struct scf_c_cfg*)&work_unit->scf_result,
+				(struct scf_c_cfg *)&work_unit->scf_result,
 				(dma_addr_t)session->history.vaddr);
 		} else if (session->engine == DCE_DECOMPRESSION) {
 			scf_d_cfg_set_pending_output_ptr(
-				(struct scf_d_cfg*)&work_unit->scf_result,
+				(struct scf_d_cfg *)&work_unit->scf_result,
 				(dma_addr_t)session->pending_output.vaddr);
 			scf_d_cfg_set_history_ptr(
-				(struct scf_d_cfg*)&work_unit->scf_result,
+				(struct scf_d_cfg *)&work_unit->scf_result,
 				(dma_addr_t)session->history.vaddr);
 			scf_d_cfg_set_decomp_ctx_ptr(
-				(struct scf_d_cfg*)&work_unit->scf_result,
+				(struct scf_d_cfg *)&work_unit->scf_result,
 				(dma_addr_t)session->decomp_context.vaddr);
 		} else {
 			ret = -EINVAL;

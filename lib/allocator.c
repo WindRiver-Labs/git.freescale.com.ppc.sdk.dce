@@ -70,6 +70,7 @@ struct bufinfo {
 static inline uint32_t *get_numbufs(struct dma_mem *map)
 {
 	uint32_t *p = (uint32_t *)((uint8_t *)map->addr + map->sz);
+
 	return &p[-1];
 }
 
@@ -77,6 +78,7 @@ static inline uint32_t *get_numbufs(struct dma_mem *map)
 static inline struct bufinfo *get_bufinfo(struct dma_mem *map, int idx)
 {
 	struct bufinfo *b = (struct bufinfo *)get_numbufs(map);
+
 	return b - (idx + 1);
 }
 
@@ -160,6 +162,7 @@ static void local_free(struct dma_mem *map, void *ptr)
 	uint32_t offset = (unsigned long)ptr - (unsigned long)map->addr;
 	struct bufinfo *buf;
 	unsigned int idx;
+
 	for (idx = 0, buf = get_bufinfo(map, 0); idx < numbufs; buf--, idx++) {
 		if (buf->offset == offset) {
 			numbufs = --(*p_numbufs);
@@ -173,7 +176,6 @@ static void local_free(struct dma_mem *map, void *ptr)
 			break;
 	}
 	fprintf(stderr, "DMA free, bad pointer!\n");
-	return;
 }
 
 static inline int map_lock(struct dma_mem *map)
@@ -193,6 +195,7 @@ void *dma_mem_memalign(struct dma_mem *map, size_t align, size_t size)
 {
 	void *ptr;
 	int ret;
+
 	ret = map_lock(map);
 	if (ret)
 		return NULL;

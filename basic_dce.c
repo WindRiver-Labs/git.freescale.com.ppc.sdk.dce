@@ -109,8 +109,8 @@ static void cleanup_dce(void)
 {
 	int ret;
 
-	/* We have to cleanup, but can only do cleanup once because resources are
-	 * shared between threads */
+	/* We have to cleanup, but can only do cleanup once because resources
+	 * are shared between threads */
 	if (!atomic_dec_and_test(&users))
 		return;
 
@@ -168,9 +168,8 @@ static int setup_dce(void)
 	dma_mem_allocator_init(dce_mem);
 
 	ret = atexit(cleanup_dce);
-	if (ret) {
+	if (ret)
 		goto err_dce_cleanup;
-	}
 
 	atomic_inc(&users);
 
@@ -191,7 +190,7 @@ err_decomp_session_create:
 do { \
 	sem_wait(x); \
 	assert(c); \
-} while(0)
+} while (0)
 
 int basic_dce_process_data(enum dce_engine dce_mode,
 		dma_addr_t input,

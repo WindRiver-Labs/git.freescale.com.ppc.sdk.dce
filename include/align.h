@@ -68,8 +68,6 @@ extern "C" {
  * @}
  */
 
-//#include <odp/api/spec/align.h>
-
 #ifdef __cplusplus
 }
 #endif

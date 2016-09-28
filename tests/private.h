@@ -38,7 +38,7 @@ static int dbg_lvl;
 #ifndef debug
 #define debug(level, fmt, args...) \
 ({ \
-	/* use printf instead of pr_err and pr_info because they do not \
+	/* use printf instead of pr_err and pr_info because they do not
 	 * print from threads other than main */ \
 	if (level <= dbg_lvl) { \
 		printf("Worker %s: ", GET_THREAD_NAME()); \

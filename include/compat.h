@@ -139,21 +139,21 @@ do { \
 		pr_crit("BUG: %s:%d\n", __FILE__, __LINE__); \
 		abort(); \
 	} \
-} while(0)
+} while (0)
 #define might_sleep_if(c)	BUG_ON(c)
 #define msleep(x) \
 do { \
 	pr_crit("BUG: illegal call %s:%d\n", __FILE__, __LINE__); \
 	exit(EXIT_FAILURE); \
-} while(0)
+} while (0)
 #else
 #ifdef pr_debug
 #undef pr_debug
 #endif
-#define pr_debug(fmt, args...)	do { ; } while(0)
-#define BUG_ON(c)		do {(void)(c); } while(0)
-#define might_sleep_if(c)	do { ; } while(0)
-#define msleep(x)		do { ; } while(0)
+#define pr_debug(fmt, args...)	do { ; } while (0)
+#define BUG_ON(c)		do {(void)(c); } while (0)
+#define might_sleep_if(c)	do { ; } while (0)
+#define msleep(x)		do { ; } while (0)
 #endif
 #define WARN_ON(c, str) \
 do { \
@@ -184,8 +184,8 @@ struct list_head n = { \
 #define INIT_LIST_HEAD(p) \
 do { \
 	struct list_head *__p298 = (p); \
-	__p298->prev = __p298->next =__p298; \
-} while(0)
+	__p298->prev = __p298->next = __p298; \
+} while (0)
 #define list_entry(node, type, member) \
 	(type *)((u64)node - offsetof(type, member))
 #define list_empty(p) \
@@ -193,7 +193,7 @@ do { \
 	const struct list_head *__p298 = (p); \
 	((__p298->next == __p298) && (__p298->prev == __p298)); \
 })
-#define list_add(p,l) \
+#define list_add(p, l) \
 do { \
 	struct list_head *__p298 = (p); \
 	struct list_head *__l298 = (l); \
@@ -201,8 +201,8 @@ do { \
 	__p298->prev = __l298; \
 	__l298->next->prev = __p298; \
 	__l298->next = __p298; \
-} while(0)
-#define list_add_tail(p,l) \
+} while (0)
+#define list_add_tail(p, l) \
 do { \
 	struct list_head *__p298 = (p); \
 	struct list_head *__l298 = (l); \
@@ -210,7 +210,7 @@ do { \
 	__p298->next = __l298; \
 	__l298->prev->next = __p298; \
 	__l298->prev = __p298; \
-} while(0)
+} while (0)
 #define list_for_each(i, l)				\
 	for (i = (l)->next; i != (l); i = i->next)
 #define list_for_each_safe(i, j, l)			\
@@ -228,7 +228,7 @@ do { \
 do { \
 	(i)->next->prev = (i)->prev; \
 	(i)->prev->next = (i)->next; \
-} while(0)
+} while (0)
 
 /* Other miscellaneous interfaces our APIs depend on; */
 #define cpu_to_le32s(p) ({ \
@@ -264,16 +264,13 @@ typedef uint32_t	phandle;
 #define GFP_KERNEL	0
 #define __KERNEL__
 #define __init
-#define __raw_readb(p)	*(const volatile unsigned char *)(p)
-#define __raw_readl(p)	*(const volatile unsigned int *)(p)
-#define __raw_writel(v, p) \
-do { \
-	*(volatile unsigned int *)(p) = (v); \
-} while (0)
+#define __raw_readb(p)	(*(const volatile unsigned char *)(p))
+#define __raw_readl(p)	(*(const volatile unsigned int *)(p))
+#define __raw_writel(v, p) *(volatile unsigned int *)(p) = (v)
 
 /* printk() stuff */
 #define printk(fmt, args...)	do_not_use_printk
-#define nada(fmt, args...)	do { ; } while(0)
+#define nada(fmt, args...)	do { ; } while (0)
 
 /* Interrupt stuff */
 typedef uint32_t	irqreturn_t;
@@ -286,6 +283,7 @@ static inline void copy_words(void *dest, const void *src, size_t sz)
 	u32 *__dest = dest;
 	const u32 *__src = src;
 	size_t __sz = sz >> 2;
+
 	BUG_ON((unsigned long)dest & 0x3);
 	BUG_ON((unsigned long)src & 0x3);
 	BUG_ON(sz & 0x3);
@@ -297,6 +295,7 @@ static inline void copy_shorts(void *dest, const void *src, size_t sz)
 	u16 *__dest = dest;
 	const u16 *__src = src;
 	size_t __sz = sz >> 1;
+
 	BUG_ON((unsigned long)dest & 0x1);
 	BUG_ON((unsigned long)src & 0x1);
 	BUG_ON(sz & 0x1);
@@ -306,7 +305,8 @@ static inline void copy_shorts(void *dest, const void *src, size_t sz)
 static inline void copy_bytes(void *dest, const void *src, size_t sz)
 {
 	u8 *__dest = dest;
-	const u8 *__src = src;
+
+	/const u8 *__src = src;
 	while (sz--)
 		*(__dest++) = *(__src++);
 }
@@ -350,8 +350,8 @@ static inline void copy_bytes(void *dest, const void *src, size_t sz)
 					spin_unlock(x);		\
 					local_irq_enable();	\
 				} while (0)
-#define spin_lock_irqsave(x, f)	do { spin_lock_irq(x); } while (0)
-#define spin_unlock_irqrestore(x, f) do { spin_unlock_irq(x); } while (0)
+#define spin_lock_irqsave(x, f)	spin_lock_irq(x)
+#define spin_unlock_irqrestore(x, f) spin_unlock_irq(x)
 
 #define raw_spinlock_t				spinlock_t
 #define raw_spin_lock_init(x)			spin_lock_init(x)
@@ -359,11 +359,8 @@ static inline void copy_bytes(void *dest, const void *src, size_t sz)
 #define raw_spin_unlock_irqrestore(x, f)	spin_unlock(x)
 
 /* Completion stuff */
-#define DECLARE_COMPLETION(n) int n = 0;
-#define complete(n) \
-do { \
-	*n = 1; \
-} while(0)
+#define DECLARE_COMPLETION(n) int n = 0
+#define complete(n) (*n = 1)
 #define wait_for_completion(n) \
 do { \
 	while (!*n) { \
@@ -371,7 +368,7 @@ do { \
 		qman_poll(); \
 	} \
 	*n = 0; \
-} while(0)
+} while (0)
 
 struct device { void *dev; };
 
@@ -382,12 +379,13 @@ platform_device *platform_device_alloc(const char *name __always_unused,
 					int id __always_unused)
 {
 	struct platform_device *ret = malloc(sizeof(*ret));
+
 	if (ret)
 		ret->dev = NULL;
 	return ret;
 }
 #define platform_device_add(pdev)	0
-#define platform_device_del(pdev)	do { ; } while(0)
+#define platform_device_del(pdev)	do { ; } while (0)
 static inline void platform_device_put(struct platform_device *pdev)
 {
 	free(pdev);
@@ -403,6 +401,7 @@ struct resource {
 static inline void *kzalloc(size_t sz, gfp_t __foo __always_unused)
 {
 	void *ptr = malloc(sz);
+
 	if (ptr)
 		memset(ptr, 0, sz);
 	return ptr;
@@ -410,6 +409,7 @@ static inline void *kzalloc(size_t sz, gfp_t __foo __always_unused)
 static inline unsigned long get_zeroed_page(gfp_t __foo __always_unused)
 {
 	void *p;
+
 	if (posix_memalign(&p, 4096, 4096))
 		return 0;
 	memset(p, 0, 4096);
@@ -429,6 +429,7 @@ static inline struct kmem_cache *kmem_cache_create(const char *n __always_unused
 			void (*c)(void *) __always_unused)
 {
 	struct kmem_cache *ret = malloc(sizeof(*ret));
+
 	if (ret) {
 		ret->sz = sz;
 		ret->align = align;
@@ -442,6 +443,7 @@ static inline void kmem_cache_destroy(struct kmem_cache *c)
 static inline void *kmem_cache_alloc(struct kmem_cache *c, gfp_t f __always_unused)
 {
 	void *p;
+
 	if (posix_memalign(&p, c->align, c->sz))
 		return NULL;
 	return p;
@@ -453,6 +455,7 @@ static inline void kmem_cache_free(struct kmem_cache *c __always_unused, void *p
 static inline void *kmem_cache_zalloc(struct kmem_cache *c, gfp_t f)
 {
 	void *ret = kmem_cache_alloc(c, f);
+
 	if (ret)
 		memset(ret, 0, c->sz);
 	return ret;
@@ -492,18 +495,21 @@ static inline unsigned long test_and_set_bits(unsigned long mask,
 					volatile unsigned long *p)
 {
 	unsigned long ret = test_bits(mask, p);
+
 	set_bits(mask, p);
 	return ret;
 }
 static inline int test_and_set_bit(int idx, volatile unsigned long *bits)
 {
 	int ret = test_bit(idx, bits);
+
 	set_bit(idx, bits);
 	return ret;
 }
 static inline int test_and_clear_bit(int idx, volatile unsigned long *bits)
 {
 	int ret = test_bit(idx, bits);
+
 	clear_bit(idx, bits);
 	return ret;
 }
@@ -516,6 +522,7 @@ static inline int find_next_zero_bit(unsigned long *bits, int limit, int idx)
 static inline int find_first_zero_bit(unsigned long *bits, int limit)
 {
 	int idx = 0;
+
 	while (test_bit(idx, bits) && (++idx < limit))
 		;
 	return idx;
@@ -623,12 +630,12 @@ typedef void (*work_func_t)(struct work_struct *work);
 void delayed_work_timer_fn(unsigned long __data);
 
 struct work_struct {
-	         atomic_long_t data;
-		 struct list_head entry;
-		 work_func_t func;
+	atomic_long_t data;
+	struct list_head entry;
+	work_func_t func;
 };
 
-#define INIT_WORK(n,m)
-#define queue_work(n,m)
+#define INIT_WORK(n, m)
+#define queue_work(n, m)
 
 #endif /* HEADER_COMPAT_H */
