@@ -319,7 +319,7 @@ int main(int argc, char *argv[])
 			pr_err("Received signal while waiting for worker %d to finish\n",
 					context->idx);
 		if (context->ret)
-			pr_err("Worker %d finished with error status %d\n",
+			pr_err("Worker %d finished with error status 0x%x\n",
 					context->idx, context->ret);
 		total_total_in += context->total_in;
 		total_total_out += context->total_out;

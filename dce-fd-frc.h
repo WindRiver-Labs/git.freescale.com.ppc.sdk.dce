@@ -189,4 +189,7 @@ int fd_frc_get_sf(struct fd_attr *d);
 
 void fd_frc_set_se(struct fd_attr *d, int enable);
 int fd_frc_get_se(struct fd_attr *d);
+
+char *dce_status_string(enum dce_status);
+
 #endif

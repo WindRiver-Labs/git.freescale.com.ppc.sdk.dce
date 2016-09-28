@@ -123,8 +123,6 @@ static void cleanup_dce(void)
 
 	vfio_cleanup_dma(dce_mem->addr);
 	free(dce_mem);
-
-	dpdcei_drv_cleanup();
 }
 
 static int setup_dce(void)
@@ -233,8 +231,19 @@ try_again:
 		pr_err("The output buffer supplied was too small\n");
 		ret = work_unit.status;
 		goto err_timedout;
+	} else if (work_unit.status == INPUT_STARVED) {
+		/* The user should only send in a complete DEFLATE stream for
+		 * decompression. A complete stream is all output produced from
+		 * the first deflate() call to the final deflate(Z_FINISH) call
+		 * that returns STREAM_END status. If basic_dce_process_data is
+		 * used in the compression stage, then every call to
+		 * basic_dce_process_data() creates a complete DEFLATE stream */
+		pr_err("Attempted to decompress a fraction of a DEFLATE stream\n");
+		ret = work_unit.status;
 	} else if (work_unit.status != STREAM_END) {
-		pr_err("Unexpected DCE status 0x%x\n", work_unit.status);
+		pr_err("Unexpected DCE status %s 0x%x\n",
+				dce_status_string(work_unit.status),
+				work_unit.status);
 		ret = work_unit.status;
 		goto err_timedout;
 	}
