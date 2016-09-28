@@ -141,7 +141,8 @@ int dce_flow_create(struct dpdcei_priv *device, struct dce_flow *flow)
 	dma_mem_allocator_init(&flow->mem);
 
 	flow->flc.len = sizeof(struct fcr);
-	flow->flc.virt = vfio_alloc(sizeof(struct fcr), FCR_ALIGN);
+	flow->flc.virt = dma_mem_memalign(&flow->mem, FCR_ALIGN,
+					sizeof(struct fcr));
 	if (!flow->flc.virt) {
 		err = -ENOMEM;
 		goto err_fcr_alloc;
