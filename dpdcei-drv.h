@@ -38,7 +38,6 @@
 #include "dce-fcr.h"
 
 struct dpdcei_priv {
-	struct fsl_mc_io *mc_dev;
 	uint16_t token;
 	struct dpaa2_io *dpio_service;
 	struct dpdcei_attr dpdcei_attrs;

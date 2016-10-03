@@ -123,6 +123,8 @@ static void cleanup_dce(void)
 
 	vfio_cleanup_dma(dce_mem->addr);
 	free(dce_mem);
+
+	dpdcei_drv_cleanup();
 }
 
 static int setup_dce(void)

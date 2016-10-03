@@ -427,8 +427,6 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io,
 		goto err_priv_alloc;
 	}
 
-	priv->mc_dev = mc_io;
-
 	/* initialize lookup table */
 	setup_flow_lookup_table(mc_io, priv);
 
@@ -612,7 +610,6 @@ static int __cold dpdcei_drv_setup(void)
 		err = -EACCES;
 		goto err_decomp_setup;
 	}
-	return err;
 
 err_decomp_setup:
 	/* TODO: dpdcei_cleanup(compression); */
@@ -681,9 +678,17 @@ void dpdcei_drv_cleanup(void)
 		spin_unlock(&driver_lock);
 		return;
 	}
-
 	assert(compression && decompression);
-	mc_io = compression->mc_dev;
+
+	mc_io = malloc(sizeof(struct fsl_mc_io));
+	if (!mc_io)
+		goto err_mc_io_alloc;
+
+	err = mc_io_init(mc_io);
+	if (err) {
+		pr_err("mc_io_init failed with error code %d", err);
+		goto err_mc_io_init;
+	}
 
 	err = dpdcei_disable(mc_io, MC_CMD_FLAG_PRI, compression->token);
 	if (err)
@@ -705,7 +710,11 @@ void dpdcei_drv_cleanup(void)
 		pr_err("error in %s in attempt to dpdcei_close(decomp)\n",
 				__func__);
 
+	mc_io_cleanup(mc_io);
 
-
+err_mc_io_init:
+	free(mc_io);
+err_mc_io_alloc:
+	spin_unlock(&driver_lock);
 }
 EXPORT_SYMBOL(dpdcei_drv_cleanup);
