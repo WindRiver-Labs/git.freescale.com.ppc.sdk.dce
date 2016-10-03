@@ -27,6 +27,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <linux/types.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -63,7 +65,6 @@
 
 #define NR_CPUS 8
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
-#define PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP { { 0, 0, 0, PTHREAD_MUTEX_ADAPTIVE_NP, { 0, 0, 0, 0 }, 0, { 0 }, 0, 0 } }
 
 extern struct dpaa2_io *devObjPtr;
 
