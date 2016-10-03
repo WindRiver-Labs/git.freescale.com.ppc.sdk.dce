@@ -625,7 +625,6 @@ err_mc_io_alloc:
 	return err;
 }
 
-#define QMAN_REV_4000   0x04000000
 static struct qbman_swp *dpio_swp;
 
 static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
@@ -636,20 +635,15 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
 	struct qbman_swp_desc desc_swp;
 	int err;
 
-	printf("INIT\n");
 	/* ***************************************** RC  */
 	assert(!dprc_open(mc_io, 0, dprc_id, &dprc_token));
 	snprintf(dprc_id_str, sizeof(dprc_id_str), "dprc.%i", dprc_id);
-	printf("Attached DPRC: %x\n", dprc_id);
 	vfio_force_rescan();
 	/* ***************************************** IO #1 */
 	assert(!dpio_open(mc_io, 0, dpio_id, &dpio_token));
 	vfio_force_rescan();
 	snprintf(dpio_id_str, sizeof(dpio_id_str), "dpio.%d", dpio_id);
-	printf("Attached: %s\n", dpio_id_str);
 
-
-	printf("BIND %s\n", dprc_id_str);
 	err = vfio_bind_container(dprc_id_str);
 	if (err) {
 		pr_err("vfio_bind_container() failed\n");
@@ -663,7 +657,6 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
 
 	vfio_force_rescan();
 
-	printf("Enable IO\n");
 	/* ***************************************** ENABLE IO */
 	assert(!dpio_enable(mc_io, 0, dpio_token));
 
