@@ -36,17 +36,16 @@ uint32_t qman_version;
 /* Management command result codes */
 #define QBMAN_MC_RSLT_OK      0xf0
 
-/* TBD: as of QBMan 4.1, DQRR will be 8 rather than 4! */
-#define QBMAN_DQRR_SIZE 4
+/* QBMan DQRR size is set at runtime in qbman_portal.c */
 
 #define QBMAN_EQCR_SIZE 8
 
 static inline u8 qm_cyc_diff(u8 ringsize, u8 first, u8 last)
 {
 	/* 'first' is included, 'last' is excluded */
-	if (first < last)
+	if (first <= last)
 		return last - first;
-	return ringsize + last - first;
+	return (2 * ringsize) + last - first;
 }
 
 /* --------------------- */
@@ -236,8 +235,12 @@ static inline int32_t qb_attr_code_makesigned(const struct qb_attr_code *code,
 					  uint32_t val)
 {
 	BUG_ON(val >= (1u << code->width));
+	/* code->width should never exceed the width of val. If it does then a
+	 * different function with larger val size must be used to translate
+	 * from unsigned to signed */
+	BUG_ON(code->width > sizeof(val) * CHAR_BIT);
 	/* If the high bit was set, it was encoding a negative */
-	if (val >= (1u << (code->width - 1)))
+	if (val >= 1u << (code->width - 1))
 		return (int32_t)0 - (int32_t)(((uint32_t)1 << code->width) -
 			val);
 	/* Otherwise, it was encoding a positive */

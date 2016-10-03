@@ -76,6 +76,7 @@ struct qb_attr_code code_generic_rslt = QB_CODE(0, 8, 8);
 struct qb_attr_code code_sdqcr_dct = QB_CODE(0, 24, 2);
 struct qb_attr_code code_sdqcr_fc = QB_CODE(0, 29, 1);
 struct qb_attr_code code_sdqcr_tok = QB_CODE(0, 16, 8);
+static struct qb_attr_code code_eq_dca_idx;
 #define CODE_SDQCR_DQSRC(n) QB_CODE(0, n, 1)
 enum qbman_sdqcr_dct {
 	qbman_sdqcr_dct_null = 0,
@@ -127,13 +128,17 @@ struct qbman_swp *qbman_swp_init(const struct qbman_swp_desc *d)
 	p->dqrr.next_idx = 0;
 	p->dqrr.valid_bit = QB_VALID_BIT;
 	qman_version = p->desc->qman_version;
-//	if ((qman_version & 0xFFFF0000) < QMAN_REV_4100) {
+	if ((qman_version & 0xFFFF0000) < QMAN_REV_4100) {
 		p->dqrr.dqrr_size = 4;
 		p->dqrr.reset_bug = 1;
-//	} else {
-//		p->dqrr.dqrr_size = 8;
-//		p->dqrr.reset_bug = 0;
-//	}
+		/* Set size of DQRR to 4, encoded in 2 bits */
+		code_eq_dca_idx = (struct qb_attr_code)QB_CODE(0, 8, 2);
+	} else {
+		p->dqrr.dqrr_size = 8;
+		p->dqrr.reset_bug = 0;
+		/* Set size of DQRR to 8, encoded in 3 bits */
+		code_eq_dca_idx = (struct qb_attr_code)QB_CODE(0, 8, 3);
+	}
 
 	ret = qbman_swp_sys_init(&p->sys, d, p->dqrr.dqrr_size);
 	if (ret) {
@@ -283,7 +288,7 @@ static struct qb_attr_code code_eq_cmd = QB_CODE(0, 0, 2);
 static struct qb_attr_code code_eq_eqdi = QB_CODE(0, 3, 1);
 static struct qb_attr_code code_eq_dca_en = QB_CODE(0, 15, 1);
 static struct qb_attr_code code_eq_dca_pk = QB_CODE(0, 14, 1);
-static struct qb_attr_code code_eq_dca_idx = QB_CODE(0, 8, 2);
+/* Can't set code_eq_dca_idx width. Need qman version. Read at runtime */
 static struct qb_attr_code code_eq_orp_en = QB_CODE(0, 2, 1);
 static struct qb_attr_code code_eq_orp_is_nesn = QB_CODE(0, 31, 1);
 static struct qb_attr_code code_eq_orp_nlis = QB_CODE(0, 30, 1);
@@ -407,9 +412,9 @@ void qbman_eq_desc_set_dca(struct qbman_eq_desc *d, int enable,
 	}
 }
 
-#define EQ_IDX(eqar)     ((eqar) & 0x7)
-#define EQ_VB(eqar)      ((eqar) & 0x80)
-#define EQ_SUCCESS(eqar) ((eqar) & 0x100)
+#define EQAR_IDX(eqar)     ((eqar) & 0x7)
+#define EQAR_VB(eqar)      ((eqar) & 0x80)
+#define EQAR_SUCCESS(eqar) ((eqar) & 0x100)
 static int qbman_swp_enqueue_array_mode(struct qbman_swp *s,
 				 const struct qbman_eq_desc *d,
 				 const struct qbman_fd *fd)
@@ -418,24 +423,18 @@ static int qbman_swp_enqueue_array_mode(struct qbman_swp *s,
 	const uint32_t *cl = qb_cl(d);
 	uint32_t eqar = qbman_cinh_read(&s->sys, QBMAN_CINH_SWP_EQAR);
 	pr_debug("EQAR=%08x\n", eqar);
-	if (!EQ_SUCCESS(eqar))
+	if (!EQAR_SUCCESS(eqar))
 		return -EBUSY;
-	p = qbman_cena_write_start_wo_shadow(&s->sys, QBMAN_CENA_SWP_EQCR(EQ_IDX(eqar)));
+	p = qbman_cena_write_start_wo_shadow(&s->sys,
+				   QBMAN_CENA_SWP_EQCR(EQAR_IDX(eqar)));
 	word_copy(&p[1], &cl[1], 7);
 	word_copy(&p[8], fd, sizeof(*fd) >> 2);
 	/* Set the verb byte, have to substitute in the valid-bit */
 	lwsync();
-	p[0] = cl[0] | EQ_VB(eqar);
-	qbman_cena_write_complete_wo_shadow(&s->sys, QBMAN_CENA_SWP_EQCR(EQ_IDX(eqar)));
+	p[0] = cl[0] | EQAR_VB(eqar);
+	qbman_cena_write_complete_wo_shadow(&s->sys,
+				  QBMAN_CENA_SWP_EQCR(EQAR_IDX(eqar)));
 	return 0;
-}
-
-static inline u8 qm_cyc_diff_test(u8 ringsize, u8 first, u8 last)
-{
-        /* 'first' is included, 'last' is excluded */
-        if (first < last)
-                return last - first;
-        return ringsize + last - first;
 }
 
 static int qbman_swp_enqueue_ring_mode(struct qbman_swp *s,
@@ -449,28 +448,28 @@ static int qbman_swp_enqueue_ring_mode(struct qbman_swp *s,
 
 	if (!s->eqcr.available) {
 		eqcr_ci = s->eqcr.ci;
-		s->eqcr.ci = EQ_IDX(qbman_cena_read_reg(&s->sys,
-				QBMAN_CENA_SWP_EQCR_CI));
-		diff = qm_cyc_diff_test(QBMAN_EQCR_SIZE,
+		s->eqcr.ci = qbman_cena_read_reg(&s->sys,
+				QBMAN_CENA_SWP_EQCR_CI) & 0xF;
+		diff = qm_cyc_diff(QBMAN_EQCR_SIZE,
 				eqcr_ci, s->eqcr.ci);
 		s->eqcr.available += diff;
 		if (!diff)
 			return -EBUSY;
 	}
 
-	s->eqcr.pi &= 0x7;
-	p = qbman_cena_write_start(&s->sys, QBMAN_CENA_SWP_EQCR(s->eqcr.pi));
+	p = qbman_cena_write_start_wo_shadow(&s->sys,
+					QBMAN_CENA_SWP_EQCR(s->eqcr.pi & 7));
 	word_copy(&p[1], &cl[1], 7);
 	word_copy(&p[8], fd, sizeof(*fd) >> 2);
 	lwsync();
 	/* Set the verb byte, have to substitute in the valid-bit */
 	p[0] = cl[0] | s->eqcr.pi_vb;
-	qbman_cena_write_complete(&s->sys, QBMAN_CENA_SWP_EQCR(s->eqcr.pi), p);
-
+	qbman_cena_write_complete_wo_shadow(&s->sys,
+					QBMAN_CENA_SWP_EQCR(s->eqcr.pi & 7));
 	s->eqcr.pi++;
-	s->eqcr.pi &= 0x7;
+	s->eqcr.pi &= 0xF;
 	s->eqcr.available--;
-	if (!(s->eqcr.pi))
+	if (!(s->eqcr.pi & 7))
 		s->eqcr.pi_vb ^= QB_VALID_BIT;
 	return 0;
 }
@@ -562,13 +561,11 @@ void qbman_pull_desc_set_numframes(struct qbman_pull_desc *d, uint8_t numframes)
 				(uint32_t)(numframes - 1));
 }
 
-/*
 void qbman_pull_desc_set_token(struct qbman_pull_desc *d, uint8_t token)
 {
 	uint32_t *cl = qb_cl(d);
 	qb_attr_code_encode(&code_pull_token, cl, token);
 }
-*/
 
 void qbman_pull_desc_set_fq(struct qbman_pull_desc *d, uint32_t fqid)
 {
@@ -657,7 +654,7 @@ const struct qbman_result *qbman_swp_dqrr_next(struct qbman_swp *s)
 
 	/* Before using valid-bit to detect if something is there, we have to
 	* handle the case of the DQRR reset bug... */
-	if (unlikely(s->dqrr.reset_bug)) {    // 2-8 not running
+	if (unlikely(s->dqrr.reset_bug)) {
 		/* We pick up new entries by cache-inhibited producer index,
 		 * which means that a non-coherent mapping would require us to
 		 * invalidate and read *only* once that PI has indicated that
@@ -677,7 +674,8 @@ const struct qbman_result *qbman_swp_dqrr_next(struct qbman_swp *s)
 		 * (which increments one at a time), rather than on pi (which
 		 * can burst and wrap-around between our snapshots of it).
 		 */
-		if (s->dqrr.next_idx == s->dqrr.dqrr_size) {
+		BUG_ON((s->dqrr.dqrr_size - 1) < 0);
+		if (s->dqrr.next_idx == (s->dqrr.dqrr_size - 1u)) {
 			pr_debug("DEBUG: next_idx=%d, pi=%d, clear reset bug\n",
 				s->dqrr.next_idx, pi);
 			s->dqrr.reset_bug = 0;
@@ -702,7 +700,7 @@ const struct qbman_result *qbman_swp_dqrr_next(struct qbman_swp *s)
 	/* There's something there. Move "next_idx" attention to the next ring
 	 * entry (and prefetch it) before returning what we found. */
 	s->dqrr.next_idx++;
-	if (s->dqrr.next_idx == QBMAN_DQRR_SIZE) {    // 13 not running
+	if (s->dqrr.next_idx == s->dqrr.dqrr_size) {
 		s->dqrr.next_idx = 0;
 		s->dqrr.valid_bit ^= QB_VALID_BIT;
 	}
@@ -744,7 +742,7 @@ int qbman_result_has_new_result(struct qbman_swp *s,
 	 * however the same address that was provided to us non-const in the
 	 * first place, for directing hardware DMA to. So we can cast away the
 	 * const because it is mutable from our perspective. */
-	uint32_t *p = qb_cl((struct qbman_result *)dq);
+	uint32_t *p = (uint32_t *)(unsigned long)qb_cl(dq);
 	uint32_t token;
 
 	token = qb_attr_code_decode(&code_dqrr_tok_detect, &p[1]);
@@ -883,7 +881,7 @@ uint32_t qbman_result_DQ_frame_count(const struct qbman_result *dq)
 
 uint64_t qbman_result_DQ_fqd_ctx(const struct qbman_result *dq)
 {
-	const uint64_t *p = (uint64_t *)qb_cl(dq);
+	const uint64_t *p = (const uint64_t *)qb_cl(dq);
 
 	return qb_attr_code_decode_64(&code_dqrr_ctx_lo, p);
 }
@@ -920,7 +918,7 @@ uint32_t qbman_result_SCN_rid(const struct qbman_result *scn)
 
 uint64_t qbman_result_SCN_ctx(const struct qbman_result *scn)
 {
-	const uint64_t *p = (uint64_t *)qb_cl(scn);
+	const uint64_t *p = (const uint64_t *)qb_cl(scn);
 
 	return qb_attr_code_decode_64(&code_scn_ctx_lo, p);
 }
@@ -1067,7 +1065,7 @@ int qbman_swp_acquire(struct qbman_swp *s, uint32_t bpid, uint64_t *buffers,
 		      unsigned int num_buffers)
 {
 	uint32_t *p;
-	uint32_t verb, rslt, num;
+	uint32_t rslt, num;
 	BUG_ON(!num_buffers || (num_buffers > 7));
 
 	/* Start the management command */
@@ -1084,10 +1082,9 @@ int qbman_swp_acquire(struct qbman_swp *s, uint32_t bpid, uint64_t *buffers,
 	p = qbman_swp_mc_complete(s, p, p[0] | QBMAN_MC_ACQUIRE);
 
 	/* Decode the outcome */
-	verb = qb_attr_code_decode(&code_generic_verb, p);
 	rslt = qb_attr_code_decode(&code_generic_rslt, p);
 	num = qb_attr_code_decode(&code_acquire_r_num, p);
-	BUG_ON(verb != QBMAN_MC_ACQUIRE);
+	BUG_ON(qb_attr_code_decode(&code_generic_verb, p) != QBMAN_MC_ACQUIRE);
 
 	/* Determine success or failure */
 	if (unlikely(rslt != QBMAN_MC_RSLT_OK)) {
@@ -1111,7 +1108,7 @@ static int qbman_swp_alt_fq_state(struct qbman_swp *s, uint32_t fqid,
 				 uint8_t alt_fq_verb)
 {
 	uint32_t *p;
-	uint32_t verb, rslt;
+	uint32_t rslt;
 
 	/* Start the management command */
 	p = qbman_swp_mc_start(s);
@@ -1123,9 +1120,8 @@ static int qbman_swp_alt_fq_state(struct qbman_swp *s, uint32_t fqid,
 	p = qbman_swp_mc_complete(s, p, p[0] | alt_fq_verb);
 
 	/* Decode the outcome */
-	verb = qb_attr_code_decode(&code_generic_verb, p);
 	rslt = qb_attr_code_decode(&code_generic_rslt, p);
-	BUG_ON(verb != alt_fq_verb);
+	BUG_ON(qb_attr_code_decode(&code_generic_verb, p) != alt_fq_verb);
 
 	/* Determine success or failure */
 	if (unlikely(rslt != QBMAN_MC_RSLT_OK)) {
@@ -1176,7 +1172,7 @@ static int qbman_swp_CDAN_set(struct qbman_swp *s, uint16_t channelid,
 			      uint64_t ctx)
 {
 	uint32_t *p;
-	uint32_t verb, rslt;
+	uint32_t rslt;
 
 	/* Start the management command */
 	p = qbman_swp_mc_start(s);
@@ -1192,9 +1188,9 @@ static int qbman_swp_CDAN_set(struct qbman_swp *s, uint16_t channelid,
 	p = qbman_swp_mc_complete(s, p, p[0] | QBMAN_WQCHAN_CONFIGURE);
 
 	/* Decode the outcome */
-	verb = qb_attr_code_decode(&code_generic_verb, p);
 	rslt = qb_attr_code_decode(&code_generic_rslt, p);
-	BUG_ON(verb != QBMAN_WQCHAN_CONFIGURE);
+	BUG_ON(qb_attr_code_decode(&code_generic_verb, p)
+					!= QBMAN_WQCHAN_CONFIGURE);
 
 	/* Determine success or failure */
 	if (unlikely(rslt != QBMAN_MC_RSLT_OK)) {

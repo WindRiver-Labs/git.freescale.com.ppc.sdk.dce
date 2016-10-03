@@ -23,6 +23,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#ifndef __QBMAN_PRIVATE_H
+#define __QBMAN_PRIVATE_H
+
 /* Perform extra checking */
 #define QBMAN_CHECKING
 
@@ -111,10 +114,12 @@ static inline u32 r32_##t(u32 lsoffset, u32 width, \
 	BUG_ON(width > (sizeof(t) * 8)); \
 	return ~(MAKE_MASK32(width) << lsoffset) & val; \
 }
+DECLARE_CODEC32(uint32_t)
 DECLARE_CODEC32(u32)
 DECLARE_CODEC32(uint16_t)
 DECLARE_CODEC32(uint8_t)
 DECLARE_CODEC32(int)
+
 	/*********************/
 	/* Debugging assists */
 	/*********************/
@@ -165,3 +170,5 @@ static inline void hexdump(const void *ptr, size_t sz)
 #define QMAN_REV_4101   0x04010001
 
 #include "qbman_sys.h"
+
+#endif /* __QBMAN_PRIVATE_H */

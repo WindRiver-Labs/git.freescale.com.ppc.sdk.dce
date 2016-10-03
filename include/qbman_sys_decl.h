@@ -22,6 +22,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef __QBMAN_SYS_DECL
+#define __QBMAN_SYS_DECL
+
 #include <compat.h>
 #include <fsl_qbman_base.h>
 
@@ -66,3 +69,5 @@ static inline void prefetch_for_store(void *p)
 {
 	asm volatile("prfm pstl1keep, [%0, #64]" : : "r" (p));
 }
+
+#endif /* __QBMAN_SYS_DECL */
