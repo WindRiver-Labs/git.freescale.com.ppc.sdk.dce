@@ -128,6 +128,10 @@ struct qbman_swp *qbman_swp_init(const struct qbman_swp_desc *d)
 	p->dqrr.next_idx = 0;
 	p->dqrr.valid_bit = QB_VALID_BIT;
 	qman_version = p->desc->qman_version;
+	if(qman_version == 0){
+		printf("MC version is older than expected, could not read the qbman version. Defaulting to 4.0\n");
+		qman_version=QMAN_REV_4000;
+	}
 	if ((qman_version & 0xFFFF0000) < QMAN_REV_4100) {
 		p->dqrr.dqrr_size = 4;
 		p->dqrr.reset_bug = 1;
@@ -559,12 +563,6 @@ void qbman_pull_desc_set_numframes(struct qbman_pull_desc *d, uint8_t numframes)
 	BUG_ON(!numframes || (numframes > 16));
 	qb_attr_code_encode(&code_pull_numframes, cl,
 				(uint32_t)(numframes - 1));
-}
-
-void qbman_pull_desc_set_token(struct qbman_pull_desc *d, uint8_t token)
-{
-	uint32_t *cl = qb_cl(d);
-	qb_attr_code_encode(&code_pull_token, cl, token);
 }
 
 void qbman_pull_desc_set_fq(struct qbman_pull_desc *d, uint32_t fqid)

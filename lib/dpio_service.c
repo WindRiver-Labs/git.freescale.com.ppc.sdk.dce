@@ -27,7 +27,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <linux/types.h>
 #include <stdio.h>
@@ -228,7 +230,7 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 	obj->swp_desc.idx = attr_dpio.id;
 	obj->swp_desc.eqcr_mode = qman_eqcr_vb_array;
 	obj->swp_desc.irq = -1;
-	obj->swp_desc.qman_version = QMAN_REV_4000;
+	obj->swp_desc.qman_version = attr_dpio.qbman_version;
 	obj->swp = qbman_swp_init(&(obj->swp_desc));
 
 	if (!obj->swp) {
