@@ -90,6 +90,11 @@ static void *worker_func(void *__context)
 	output_sz = context->mode == DCE_COMPRESSION ? chunk_size * 2 :
 							chunk_size * 15;
 	output = dce_alloc(output_sz);
+	if (!output) {
+		pr_err("Unable to allocate dma memory for DCE\n");
+		exit(EXIT_FAILURE);
+	}
+
 	context->total_in = 0;
 	context->total_out = 0;
 
@@ -229,6 +234,10 @@ int main(int argc, char *argv[])
 			struct chunk *new_chunk = malloc(sizeof(struct chunk));
 
 			new_chunk->addr = dce_alloc(bytes_in);
+			if (!new_chunk->addr) {
+				pr_err("Unable to allocate dma memory for DCE\n");
+				exit(EXIT_FAILURE);
+			}
 			memcpy((void *)new_chunk->addr, buf, bytes_in);
 			new_chunk->size = bytes_in;
 			list_add_tail(&new_chunk->node, &chunk_list);
@@ -250,6 +259,10 @@ int main(int argc, char *argv[])
 				dce_test_data_size - (i * chunk_size) :
 				chunk_size;
 			new_chunk->addr = dce_alloc(new_chunk->size);
+			if (!new_chunk->addr) {
+				pr_err("Unable to allocate dma memory for DCE\n");
+				exit(EXIT_FAILURE);
+			}
 			memcpy((void *)new_chunk->addr, &dce_test_data[i * chunk_size],
 					new_chunk->size);
 			list_add_tail(&new_chunk->node, &chunk_list);

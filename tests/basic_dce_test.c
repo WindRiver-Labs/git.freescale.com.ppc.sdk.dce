@@ -43,8 +43,16 @@ int main(void)
 
 	input_sz = dce_test_data_size;
 	input = dce_alloc(input_sz);
+	if (!input) {
+		pr_err("Unable to allocate dma memory for DCE\n");
+		exit(EXIT_FAILURE);
+	}
 	output_sz = input_sz * 2;
 	output = dce_alloc(output_sz);
+	if (!output) {
+		pr_err("Unable to allocate dma memory for DCE\n");
+		exit(EXIT_FAILURE);
+	}
 
 	/* Get input data from sample data file */
 	memcpy((void *)input, dce_test_data, input_sz);

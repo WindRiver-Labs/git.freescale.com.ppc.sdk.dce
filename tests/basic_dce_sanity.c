@@ -241,6 +241,10 @@ int main(int argc, char *argv[])
 			struct chunk *new_chunk = malloc(sizeof(struct chunk));
 
 			new_chunk->addr = dce_alloc(bytes_in);
+			if (!new_chunk->addr) {
+				pr_err("Unable to allocate dma memory for DCE\n");
+				exit(EXIT_FAILURE);
+			}
 			memcpy((void *)new_chunk->addr, buf, bytes_in);
 			new_chunk->size = bytes_in;
 			list_add_tail(&new_chunk->node, &chunk_list);
