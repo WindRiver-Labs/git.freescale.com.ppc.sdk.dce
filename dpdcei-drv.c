@@ -30,6 +30,9 @@
 #include <linux/types.h>
 
 #include <pthread.h>
+#include <signal.h>
+#include <sys/prctl.h>
+#include <semaphore.h>
 #include <compat.h>
 
 #include <fsl_mc_cmd.h>
@@ -556,12 +559,18 @@ err_priv_alloc:
 
 static DEFINE_SPINLOCK(driver_lock);
 
+static void reaper(int piper[2]);
+
+#define NUM_RESOURCES 4
+
 static int __cold dpdcei_drv_setup(void)
 {
 	struct fsl_mc_io *mc_io;
 	struct dpaa2_io *dpio_p;
 	int dprc_id, dpio_id;
 	uint16_t root_dprc_token;
+	int piper[2];
+	int buff[NUM_RESOURCES];
 	int err = 0;
 
 	spin_lock(&driver_lock);
@@ -572,6 +581,24 @@ static int __cold dpdcei_drv_setup(void)
 
 	/* it should never be that we have one engine and not the other */
 	assert(!compression && !decompression);
+
+	err = pipe(piper);
+	if (err)
+		pr_err("Could not create pipe for child process\n");
+
+	switch (fork()) {
+	case -1:
+		pr_err("failed to create resource cleanup process\n");
+		break;
+	case 0: /* cleanup process */
+		close(piper[1]); /* child only reads */
+		reaper(piper);
+		assert(false); /* Should never be reached */
+		break;
+	default:
+		close(piper[0]); /* parent only writes */
+		break;
+	}
 
 	mc_io = malloc(sizeof(struct fsl_mc_io));
 	if (!mc_io) {
@@ -610,6 +637,16 @@ static int __cold dpdcei_drv_setup(void)
 		err = -EACCES;
 		goto err_decomp_setup;
 	}
+
+	/* Send resources information to child for cleanup */
+
+	buff[0] = dprc_id;
+	buff[1] = compression->dpdcei_attrs.id;
+	buff[2] = decompression->dpdcei_attrs.id;
+	buff[3] = compression->dpio_p->swp_desc.idx;
+	err = write(piper[1], (char *)buff, sizeof(buff));
+	if (err != sizeof(buff))
+		pr_err("write faild\n");
 
 err_decomp_setup:
 	/* TODO: dpdcei_cleanup(compression); */
@@ -666,12 +703,15 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
 	desc_swp.irq = -1;
 	desc_swp.qman_version = QMAN_REV_4000;
 	dpio_swp = qbman_swp_init(&desc_swp);
+	qbman_swp_finish(dpio_swp);
 }
 
 void dpdcei_drv_cleanup(void)
 {
 	int err;
 	struct fsl_mc_io *mc_io;
+	uint16_t temp_token;
+	extern int vfio_fd, vfio_group_fd;
 
 	spin_lock(&driver_lock);
 	if (!compression || !decompression) {
@@ -681,36 +721,71 @@ void dpdcei_drv_cleanup(void)
 	assert(compression && decompression);
 
 	mc_io = malloc(sizeof(struct fsl_mc_io));
-	if (!mc_io)
+	if (!mc_io) {
+		pr_err("Could not malloc mem for mc_io in %s\n", __func__);
 		goto err_mc_io_alloc;
+	}
 
 	err = mc_io_init(mc_io);
 	if (err) {
-		pr_err("mc_io_init failed with error code %d", err);
+		pr_err("error %d in %s in attempt to mc_io_init\n",
+				err, __func__);
 		goto err_mc_io_init;
 	}
 
+	err = dpdcei_open(mc_io, MC_CMD_FLAG_PRI, compression->dpdcei_attrs.id,
+							&compression->token);
+	if (err)
+		pr_err("error %d in %s in attempt to dpdcei_open(comp)\n",
+				err, __func__);
+
 	err = dpdcei_disable(mc_io, MC_CMD_FLAG_PRI, compression->token);
 	if (err)
-		pr_err("error in %s in attempt to dpdcei_disable(comp)\n",
-				__func__);
+		pr_err("error %d in %s in attempt to dpdcei_disable(comp)\n",
+				err, __func__);
 
 	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, compression->token);
 	if (err)
-		pr_err("error in %s in attempt to dpdcei_close(comp)\n",
-				__func__);
+		pr_err("error %d in %s in attempt to dpdcei_close(comp)\n",
+				err, __func__);
+
+	err = dpdcei_open(mc_io, MC_CMD_FLAG_PRI,
+			decompression->dpdcei_attrs.id, &decompression->token);
+	if (err)
+		pr_err("error %d in %s in attempt to dpdcei_open(decomp)\n",
+				err, __func__);
 
 	err = dpdcei_disable(mc_io, MC_CMD_FLAG_PRI, decompression->token);
 	if (err)
-		pr_err("error in %s in attempt to dpdcei_disable(decomp)\n",
-				__func__);
+		pr_err("error %d in %s in attempt to dpdcei_disable(decomp)\n",
+				err, __func__);
 
 	err = dpdcei_close(mc_io, MC_CMD_FLAG_PRI, decompression->token);
 	if (err)
-		pr_err("error in %s in attempt to dpdcei_close(decomp)\n",
-				__func__);
+		pr_err("error %d in %s in attempt to dpdcei_close(decomp)\n",
+				err, __func__);
+
+	err = dpio_open(mc_io, MC_CMD_FLAG_PRI,
+			compression->dpio_p->swp_desc.idx, &temp_token);
+	if (err)
+		pr_err("error %d in %s in attempt to dpio_open()\n",
+				err, __func__);
+
+	err = dpio_disable(mc_io, MC_CMD_FLAG_PRI, temp_token);
+	if (err)
+		pr_err("error %d in %s in attempt to dpio_disable()\n",
+				err, __func__);
+
+	err = dpio_close(mc_io, MC_CMD_FLAG_PRI, temp_token);
+	if (err)
+		pr_err("error %d in %s in attempt to dpio_close()\n",
+				err, __func__);
 
 	mc_io_cleanup(mc_io);
+
+	vfio_force_rescan();
+	close(vfio_group_fd);
+	close(vfio_fd);
 
 err_mc_io_init:
 	free(mc_io);
@@ -718,3 +793,96 @@ err_mc_io_alloc:
 	spin_unlock(&driver_lock);
 }
 EXPORT_SYMBOL(dpdcei_drv_cleanup);
+
+static sem_t dce_finished_wait;
+
+static void parent_dead_signal_handler(int signal)
+{
+	assert(signal == SIGHUP);
+	sem_post(&dce_finished_wait);
+}
+
+static void reaper(int piper[2])
+{
+	struct sigaction act;
+	int dprc_id, dpio_id, comp_dpdcei_id, decomp_dpdcei_id;
+	char dprc_str[50];
+	char restool_cmd[200];
+	int buff[NUM_RESOURCES];
+	int err;
+
+	memset (&act, 0, sizeof (act));
+	sem_init(&dce_finished_wait, 0, 0);
+	act.sa_handler = parent_dead_signal_handler;
+	if (sigaction(SIGHUP, &act, NULL) < 0) {
+		perror ("failed to setup DCE resources cleanup process\n");
+		exit (-1);
+	}
+	/* Setup signal when parent dies */
+	prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+	/* Put child process in its own group to ignore ^C & other signals */
+	setpgid(0 /* get my pid */, 0 /* make my own group id */);
+
+	/* Wait for kernel to send us SIGHUP. We registered to get this signal
+	 * if our parent dies */
+	sem_wait(&dce_finished_wait);
+
+	/* Read resource information from parent */
+	err = read(piper[0], (char *)buff, sizeof(buff));
+	if (err != sizeof(buff))
+		pr_err("read faild\n");
+
+	dprc_id = buff[0];
+	comp_dpdcei_id = buff[1];
+	decomp_dpdcei_id = buff[2];
+	dpio_id = buff[3];
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dprc assign dprc.%d --object=%s.%d --plugged=0",
+		dprc_id, "dpdcei", comp_dpdcei_id);
+	if (system(restool_cmd))
+		pr_err("restool unplug comp dpdcei failed\n");
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dprc assign dprc.%d --object=%s.%d --plugged=0",
+		dprc_id, "dpdcei", decomp_dpdcei_id);
+	if (system(restool_cmd))
+		pr_err("restool unplug decomp dpdcei failed\n");
+
+	snprintf(dprc_str, sizeof(dprc_str), "dprc.%d",
+			dprc_id);
+	err = vfio_unbind_container(dprc_str);
+	if (err)
+		pr_err("vfio_unbind_container failed for %s\n", dprc_str);
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dprc assign dprc.%d --object=%s.%d --plugged=0",
+		dprc_id, "dpio", dpio_id);
+	if (system(restool_cmd))
+		pr_err("restool unplug decomp dpdcei failed\n");
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dpdcei destroy dpdcei.%d",
+		comp_dpdcei_id);
+	if (system(restool_cmd))
+		pr_err("restool destroy comp dpdcei failed\n");
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dpdcei destroy dpdcei.%d",
+		decomp_dpdcei_id);
+	if (system(restool_cmd))
+		pr_err("restool destroy decomp dpdcei failed\n");
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dpio destroy dpio.%d", dpio_id);
+	if (system(restool_cmd))
+		pr_err("restool destroy dpio failed\n");
+
+	snprintf(restool_cmd, sizeof(restool_cmd),
+		"restool dprc destroy dprc.%d", dprc_id);
+	if (system(restool_cmd))
+		pr_err("restool destroy dprc failed\n");
+
+	exit(EXIT_SUCCESS);
+}
