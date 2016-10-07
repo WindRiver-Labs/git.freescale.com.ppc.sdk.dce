@@ -681,6 +681,8 @@ const struct qbman_result *qbman_swp_dqrr_next(struct qbman_swp *s)
 		qbman_cena_invalidate_prefetch(&s->sys,
 				QBMAN_CENA_SWP_DQRR(s->dqrr.next_idx));
 	}
+	qbman_cena_invalidate_prefetch(&s->sys,
+				QBMAN_CENA_SWP_DQRR(s->dqrr.next_idx));
 	dq = qbman_cena_read_wo_shadow(&s->sys,
 					QBMAN_CENA_SWP_DQRR(s->dqrr.next_idx));
 	p = qb_cl(dq);
