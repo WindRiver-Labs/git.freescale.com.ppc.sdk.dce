@@ -60,9 +60,7 @@ libdce.a: $(OBJS)
 
 install:
 	install -d $(PREFIX) $(EXEC_PREFIX)
-	install -m 755 restool $(PREFIX)
-	cp -d scripts/* $(EXEC_PREFIX)
-	chmod 755 $(EXEC_PREFIX)/ls-main
+	install -m 755 basic_dce_test basic_dce_perf basic_dce_sanity $(PREFIX)
 
 clean:
 	rm -f $(OBJS) \
