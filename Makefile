@@ -40,7 +40,6 @@ CFLAGS = -Iinclude \
 LDFLAGS = -static -Wl,--hash-style=gnu ${EXTRA_CFLAGS}
 
 PREFIX = $(DESTDIR)/sbin
-EXEC_PREFIX = $(DESTDIR)/usr/sbin
 
 HEADER_DEPENDENCIES = $(subst .o,.d,$(OBJS))
 
@@ -59,7 +58,7 @@ libdce.a: $(OBJS)
 	$(AR) rcs $@ $(OBJS)
 
 install:
-	install -d $(PREFIX) $(EXEC_PREFIX)
+	install -d $(PREFIX)
 	install -m 755 basic_dce_test basic_dce_perf basic_dce_sanity $(PREFIX)
 
 clean:
