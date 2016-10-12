@@ -140,6 +140,9 @@ static const char STR_num_threads[] = "--num-threads=";
 static const char STR_debug[] = "-d";
 
 static const char STR_usage[] =
+"basic_dce_sanity is an internal developer tool. It writes the output of the\n"
+"DCE opration to files named <path>_out. <path> is given in --in=<path>\n"
+"\n"
 "Usage:\n"
 "    basic_dce_sanity --in=<path> [options]\n"
 "Options:\n"
