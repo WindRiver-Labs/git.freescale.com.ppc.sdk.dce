@@ -52,15 +52,11 @@ root@ls2080ardb:~#
 root@ls2080ardb:~# ./basic_dce_perf --in=sample_file --chunk-size=65536 --num-threads=4
 Created DPRC: 7
 Created: dpio.13
-INIT
-Attached DPRC: 7
-Attached: dpio.13
-BIND dprc.7
 [ 6359.350749] vfio-fsl-mc dprc.7: Binding with vfio-fsl_mc driver
 [ 6359.419749] vfio-fsl-mc dpio.13: Binding with vfio-fsl_mc driver
 VFIO group ID is 11
 Enable IO
 DPDCEI: id=10, engine=COMPRESSION
 DPDCEI: id=11, engine=DECOMPRESSION
-Took 3239728 us to process 3480540952 bytes, and output 689712834 bytes
+Took 3239728 us to process 3480540952 bytes, and output 689712834 bytes. Cycles elapsed 81081838. Counter frequency is 25027360
 Throughput is 8594 Mbps

@@ -139,6 +139,8 @@ static const char STR_num_threads[] = "--num-threads=";
 static const char STR_debug[] = "-d";
 
 static const char STR_usage[] =
+"basic_dce_perf measures throughput of DCE under conditions supplied to test\n"
+"\n"
 "Usage:\n"
 "    basic_dce_perf [options]\n"
 "Options:\n"
@@ -273,8 +275,6 @@ int main(int argc, char *argv[])
 	start = read_cntvct();
 	usleep(50000);
 	end = read_cntvct();
-	printf("Took us %lu for 50 ms delay. That is a freq of %lu\n",
-			end - start, (end - start) * 20);
 	cpufreq = (end - start) * 20;
 
 	debug(1, "Number of testing threads %u\n", num_threads);
@@ -346,7 +346,7 @@ int main(int argc, char *argv[])
 	else
 		run_time = end - start;
 	test_time_us = (uint64_t) 1000000 * run_time / cpufreq;
-	pr_info("Took %lu us to process %zu bytes, and output %zu. CPU Cycles %lu. CPU frequency is %lu\n",
+	pr_info("Took %lu us to process %zu bytes, and output %zu bytes. Cycles elapsed %lu. Counter frequency is %lu\n",
 			test_time_us,
 			total_total_in,
 			total_total_out,
