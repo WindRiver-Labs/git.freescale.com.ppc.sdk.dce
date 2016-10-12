@@ -1,0 +1,62 @@
+This README describes how to build and run the basic_dce_perf test. It assumes
+that the reader is familiar with the yocto (environment using bitbake to build
+software). The steps detailed in this file were
+tested on SDK 2.0 release run on an ls2080/ls2085 (DPAA2 rev 1) target.
+
+basic_dce_perf test
+basic_dce_perf is a test application to exercise and provide an example for
+using the Basic DCE API. It runs in userspace and makes calls to the Basic DCE
+API to compress or decompress data. Multiple threads are used in the test. The
+number of threads can be selected by passing a parameter to the test. Please use
+the --help option to get a full list of parameters.
+
+The Basic DCE API, passes input from the test to the DCE API. The DCE API sends
+the data to the DCE accelerator for compression/decompression.
+
+The Basic DCE API is defined in basic_dce.h.
+The DCE API is defined in dce.h.
+
+Building the Basic DCE API userspace application:
+
+1. place the dce folder inside the sdk/sources/ directory
+2. export ARCH=arm64
+3. export CROSS_COMPILE=path-to-arm-compiler- #e.g. /opt/aarch64-toolchain/gcc-linaro-aarch64-linux-gnu-4.8-2013.12_linux/bin/aarch64-linux-gnu-
+4. if using the yocto built compiler then export YOCTO_SYSROOT=path-to-ls2080ardb-sysroot. #e.g. /home/myhome/sdk_2.0/build_ls2080ardb/tmp/sysroots/ls2080ardb. Then export EXTRA_CFLAGS=--sysroot=${YOCTO_SYSROOT}
+5. type make in the dce directory $ /sdk_2.0/sources/dce$ make
+
+Running the test application:
+
+Included in this release are applications of the Basic DCE API layer, which in
+itself is an application of the DCE API layer. The Basic DCE API allows for
+simple synchronous applications, whereas the DCE API allows for more flexible
+asynchronous applications. The example below shows a synchronous multithreaded
+application of the Basic DCE API.
+
+Example:
+
+kernel boot
+...
+...
+done.
+Starting network benchmark server: netserver.
+Starting system log daemon...0
+Starting kernel log daemon...0
+Starting internet superserver: xinetd.
+
+QorIQ SDK (FSL Reference Distro) 2.0 ls2080ardb /dev/ttyS1
+
+ls2080ardb login: root
+root@ls2080ardb:~# chmod +x basic_dce_perf
+root@ls2080ardb:~#
+root@ls2080ardb:~#
+root@ls2080ardb:~# ./basic_dce_perf --in=sample_file --chunk-size=65536 --num-threads=4
+Created DPRC: 7
+Created: dpio.13
+[ 6359.350749] vfio-fsl-mc dprc.7: Binding with vfio-fsl_mc driver
+[ 6359.419749] vfio-fsl-mc dpio.13: Binding with vfio-fsl_mc driver
+VFIO group ID is 11
+Enable IO
+DPDCEI: id=10, engine=COMPRESSION
+DPDCEI: id=11, engine=DECOMPRESSION
+Took 3239728 us to process 3480540952 bytes, and output 689712834 bytes. Cycles elapsed 81081838. Counter frequency is 25027360
+Throughput is 8594 Mbps
