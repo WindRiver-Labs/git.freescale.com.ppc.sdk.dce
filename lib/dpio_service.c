@@ -60,17 +60,22 @@
 #include "qbman_debug.h"
 #include "compat.h"
 
+#include <sys/eventfd.h>
+#include <sys/epoll.h>
+
 #define PTR_ALIGN(p, a)            ((typeof(p))ALIGN((unsigned long)(p), (a)))
 #define FIRST_DPIO_STASH 4
-
-#define INTERRUPT_POLLING_INTERVAL 100
+#define VFIO_DMA_MAP_FLAG_MMIO (1 << 2)               /* non-cachable device region */
 
 #define NR_CPUS 8
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
-extern struct dpaa2_io *devObjPtr;
+#define IRQ_SET_BUF_LEN  (sizeof(struct vfio_irq_set) + sizeof(int))
 
-static pthread_t process_interrupt_thread;
+#define VFIO_DEVICE_FLAGS_FSL_MC (1 << 4)        /* vfio Freescale MC device */
+
+//extern struct dpaa2_io *devObjPtr;
+
 struct dpaa2_io *obj;
 
 struct dpaa2_io_store {
@@ -88,9 +93,102 @@ static struct dpaa2_io *dpio_by_cpu[NR_CPUS];
 static struct list_head dpio_list = LIST_HEAD_INIT(dpio_list);
 static DEFINE_SPINLOCK(dpio_list_lock) ;
 
+extern int vfio_fd;
+extern int vfio_group_fd;
+static int efd;
+static int dpio_epollfd;
+
 /**********************/
 /* Internal functions */
 /**********************/
+
+static int vfio_init_regions(int vfio_fd, int deviceFd, int* efd)
+{
+        struct vfio_device_info dev_info = { .argsz = sizeof(dev_info) };
+        struct vfio_region_info reg_info = { .argsz = sizeof(reg_info) };
+        struct vfio_irq_info irq_info = { .argsz = sizeof(irq_info) };
+        struct vfio_irq_set *irq_set;
+        char irq_set_buf[IRQ_SET_BUF_LEN];
+        int ret;
+	unsigned int i;
+        int *fd_ptr;
+        unsigned long *vaddr = NULL;
+        struct vfio_iommu_type1_dma_map map = {
+                .argsz = sizeof(map),
+                .flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE | VFIO_DMA_MAP_FLAG_MMIO,
+                .vaddr = 0x6030000,
+                .iova = 0x6030000,
+                .size = 0x1000,
+        };
+
+        struct vfio_iommu_type1_dma_unmap unmap = {
+                .argsz = sizeof(unmap),
+                .flags = 0,
+                .iova = 0x6030000,
+                .size = 0x1000,
+        };
+
+        vaddr = (unsigned long *) mmap(NULL, 0x1000, PROT_WRITE | PROT_READ, MAP_SHARED, deviceFd, 0x6030000);
+        assert (vaddr != MAP_FAILED);
+
+        map.vaddr = (unsigned long)vaddr;
+        ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &map);
+
+	/* retry */
+        if (errno == EBUSY) {
+                ret = ioctl(vfio_fd, VFIO_IOMMU_UNMAP_DMA, &unmap);
+                if (ret)
+                        printf("Error in vfio_dma_unmap\n");
+
+                ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &map);
+        } 
+	if (ret != 0) 
+        	return ret;
+
+	if (errno) 
+        	return errno;
+
+        assert(!ioctl(deviceFd, VFIO_DEVICE_GET_INFO, &dev_info));
+        assert (dev_info.flags & VFIO_DEVICE_FLAGS_FSL_MC);
+
+        for (i = 0; i < dev_info.num_regions; i++) {
+                unsigned long *map = NULL;
+                size_t size;
+
+                reg_info.index = i;
+                assert(!ioctl(deviceFd, VFIO_DEVICE_GET_REGION_INFO, &reg_info));
+                size = reg_info.size;
+                if (reg_info.size < 0x1000)
+                        size = 0x1000;
+
+                map = (unsigned long *) mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, deviceFd, reg_info.offset);
+                assert (map != MAP_FAILED);
+        }
+        /* Set irqs */
+        irq_info.index = 0;
+        assert(!ioctl(deviceFd, VFIO_DEVICE_GET_IRQ_INFO, &irq_info));
+
+        /* Now set up IRQ : we know count is always one */
+        *efd = eventfd(0, 0);
+        if (*efd < 0) {
+		printf("Error creating eventfd() %d\n", *efd);
+		return -1;
+        }
+
+	/* Register interrupt */
+        irq_set = (struct vfio_irq_set *)irq_set_buf;
+        irq_set->argsz = sizeof(irq_set_buf);
+        irq_set->count = irq_info.count;
+        irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
+        irq_set->index = VFIO_DPIO_DATA_IRQ_INDEX;
+        irq_set->start = 0;
+        fd_ptr = (int *)&irq_set->data;
+        *fd_ptr = *efd;
+        assert(ioctl(deviceFd, VFIO_DEVICE_SET_IRQS, irq_set)>=0);
+
+	return 0;
+}
+
 static inline struct dpaa2_io *service_select_by_cpu(struct dpaa2_io *d,
 						     int cpu)
 {
@@ -120,16 +218,82 @@ static inline struct dpaa2_io *service_select(struct dpaa2_io *d)
 	return d;
 }
 
-static void *process_interrupt(void *not_used)
+static void *handle_interrupts(void *not_used)
 {
-	(void)not_used; /* Silence compiler warning. Will be used in future */
-	while(1){
-		usleep(INTERRUPT_POLLING_INTERVAL);
-		if(qbman_swp_interrupt_read_status(obj->swp)) {
-			dpaa2_io_irq(obj);
+        (void)not_used; /* Silence compiler warning. */
+        int nfds;
+        struct epoll_event events[10];
+
+	
+        for(;;) {
+                nfds = epoll_wait(dpio_epollfd, events, 1, -1);
+		/* epoll_wait fail */
+		if (nfds < 0) {
+			if (errno == EINTR){
+				/* System call interrupt, not an error */
+				continue;
+			}
+                        pr_err("epoll_wait returns with fail %i\n", nfds);
+			continue;
 		}
+		/* epoll_wait timeout, will never happens here */
+		else if (nfds == 0) {
+				pr_err("Timeout\n");
+				continue;
+		}
+		/* epoll_wait has at least one fd ready to read */
+		dpaa2_io_irq(obj);
 	}
 	return NULL;
+}
+
+static int init_interrupt(struct qbman_swp *swp, int dpio_id)
+{
+        struct vfio_group_status status = { .argsz = sizeof(status) };
+        char pathIommu[PATH_MAX];
+        char deviceName[PATH_MAX];
+        char iommuGroupPath[PATH_MAX], *groupName;
+        int groupid, len, deviceFd;
+
+	/* Get deviceName and groupid */
+	snprintf(deviceName, sizeof(deviceName),"dpio.%i", dpio_id);
+        snprintf(pathIommu, sizeof(pathIommu), "/sys/bus/fsl-mc/devices/%s/iommu_group", deviceName);
+        len = readlink(pathIommu, iommuGroupPath, PATH_MAX);
+        assert (len != -1);
+        iommuGroupPath[len] = 0;
+        groupName = basename(iommuGroupPath);
+        assert (sscanf(groupName, "%d", &groupid) == 1);
+        assert (groupid >= 0);
+
+	/* Status */
+        assert (vfio_group_fd >= 0);
+        assert (!ioctl(vfio_group_fd, VFIO_GROUP_GET_STATUS, &status));
+        assert (status.flags & VFIO_GROUP_FLAGS_VIABLE);
+        assert(ioctl(vfio_fd, VFIO_GET_API_VERSION) == VFIO_API_VERSION);
+
+        /* Set Device information */
+        deviceFd = ioctl(vfio_group_fd, VFIO_GROUP_GET_DEVICE_FD, deviceName);
+        assert (deviceFd >= 0);
+        assert(!vfio_init_regions(vfio_fd, deviceFd, &efd));
+	assert(ioctl(deviceFd, VFIO_DEVICE_RESET));
+
+	/* Setup epoll */	
+	dpio_epollfd = epoll_create(1);
+	struct epoll_event epoll_ev;
+	epoll_ev.events = EPOLLIN | EPOLLPRI | EPOLLET;
+	epoll_ev.data.fd = efd;
+	assert(epoll_ctl(dpio_epollfd, EPOLL_CTL_ADD, efd, &epoll_ev) >= 0);
+
+	/* Enable interrupts */
+        qbman_swp_interrupt_set_trigger(swp, QBMAN_SWP_INTERRUPT_DQRI);
+        qbman_swp_interrupt_clear_status(swp, 0xffffffff);
+        qbman_swp_interrupt_set_inhibit(swp, 0);
+
+	/* Create the interrupt thread */
+	static pthread_t intr_thread;
+	assert(!pthread_create(&intr_thread, NULL, handle_interrupts, NULL));
+
+	return 0;
 }
 
 /**********************/
@@ -244,10 +408,6 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 	spin_lock_init(&obj->lock_notifications);
 	INIT_LIST_HEAD(&obj->notifications);
 
-	/* This will cause: [ 1092.125040] arm-smmu 5000000.iommu: Unhandled context fault: iova=0x06030040, fsynr=0x12, cb=0 */
-	/* For now only enable DQRR interrupts */
-	/*	qbman_swp_interrupt_set_trigger(obj->swp, QBMAN_SWP_INTERRUPT_DQRI); */
-
 	qbman_swp_interrupt_clear_status(obj->swp, 0xffffffff);
 	if (obj->dpio_desc.receives_notifications)
 		qbman_swp_push_set(obj->swp, 0, 1);
@@ -259,7 +419,8 @@ struct dpaa2_io *dpaa2_io_create(const int dpio_id)
 		dpio_by_cpu[cpu] = obj;
 	spin_unlock(&dpio_list_lock);
 
-	if(pthread_create(&process_interrupt_thread, NULL, &process_interrupt, NULL)) {
+	if(init_interrupt(obj->swp, dpio_id)) {
+		printf("fail init_interrupt\n");
 		kfree(obj);
 		return NULL;
 	}
@@ -323,8 +484,10 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 
 	swp = obj->swp;
 	status = qbman_swp_interrupt_read_status(swp);
-	if (!status)
+	if (!status) {
+		printf("Nothing to process\n");
 		return 0;
+	}
 
 	swp = obj->swp;
 	dq = qbman_swp_dqrr_next(swp);
@@ -332,7 +495,7 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 		if (qbman_result_is_SCN(dq)) {
 			struct dpaa2_io_notification_ctx *ctx;
 			u64 q64;
-
+	
 			q64 = qbman_result_SCN_ctx(dq);
 			ctx = (void *)q64;
 			ctx->cb(ctx);
@@ -342,10 +505,9 @@ int dpaa2_io_irq(struct dpaa2_io *obj)
 		qbman_swp_dqrr_consume(swp, dq);
 		++max;
 		if (max > DPAA_POLL_MAX)
-			goto done;
+			break;
 		dq = qbman_swp_dqrr_next(swp);
 	}
-done:
 	qbman_swp_interrupt_clear_status(swp, status);
 	qbman_swp_interrupt_set_inhibit(swp, 0);
 	return IRQ_HANDLED;
