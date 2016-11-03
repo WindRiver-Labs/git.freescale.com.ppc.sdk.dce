@@ -39,16 +39,17 @@ int main(void)
 	dma_addr_t input;
 	dma_addr_t output;
 	size_t input_sz, output_sz, output_produced;
+	int vfio_fd, vfio_group_fd;
 	int ret;
 
 	input_sz = dce_test_data_size;
-	input = dce_alloc(input_sz);
+	input = dce_alloc(&vfio_fd, &vfio_group_fd, input_sz);
 	if (!input) {
 		pr_err("Unable to allocate dma memory for DCE\n");
 		exit(EXIT_FAILURE);
 	}
 	output_sz = input_sz * 2;
-	output = dce_alloc(output_sz);
+	output = dce_alloc(&vfio_fd, &vfio_group_fd, output_sz);
 	if (!output) {
 		pr_err("Unable to allocate dma memory for DCE\n");
 		exit(EXIT_FAILURE);

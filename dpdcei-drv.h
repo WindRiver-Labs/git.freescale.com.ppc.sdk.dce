@@ -58,12 +58,12 @@ struct dpdcei_priv {
 };
 
 /* Hack to get access to device */
-struct dpdcei_priv *get_compression_device(void);
-struct dpdcei_priv *get_decompression_device(void);
+struct dpdcei_priv *get_compression_device(int *vfio_fd, int *vfio_group_fd);
+struct dpdcei_priv *get_decompression_device(int *vfio_fd, int *vfio_group_fd);
 
 /* Cleans up all dce resources. Must not be called before all DCE users in this
  * process are finished using DCE */
-void dpdcei_drv_cleanup(void);
+void dpdcei_drv_cleanup(int vfio_fd, int vfio_group_fd);
 
 struct flc_dma {
 	void *virt;
@@ -98,7 +98,7 @@ struct dce_flow {
  * In the future the hope is to create a dynamic allocator of dma able memory
  * where the caller does not need to specify a specific map */
 #define MAX_RESOURCE_IN_FLIGHT ((320 * 50000) & ~0xFFF)
-int dce_flow_create(struct dpdcei_priv *dev, struct dce_flow *flow);
+int dce_flow_create(int vfio_fd, struct dpdcei_priv *dev, struct dce_flow *flow);
 int dce_flow_destroy(struct dce_flow *flow);
 
 int enqueue_fd(struct dce_flow *flow, struct dpaa2_fd *fd);

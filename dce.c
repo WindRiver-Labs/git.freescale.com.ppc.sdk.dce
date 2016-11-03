@@ -220,7 +220,7 @@ static int alloc_dce_internals(struct dce_session *session)
 	return 0;
 }
 
-int dce_session_create(struct dce_session *session,
+int dce_session_create(int *vfio_fd, int *vfio_group_fd, struct dce_session *session,
 		       struct dce_session_params *params)
 {
 	struct dpdcei_priv *device;
@@ -237,16 +237,16 @@ int dce_session_create(struct dce_session *session,
 
 	/* get (de)compression device */
 	if (params->engine == DCE_COMPRESSION)
-		device = get_compression_device();
+		device = get_compression_device(vfio_fd, vfio_group_fd);
 	else if (params->engine == DCE_DECOMPRESSION)
-		device = get_decompression_device();
+		device = get_decompression_device(vfio_fd, vfio_group_fd);
 	else
 		return -EINVAL;
 
 	if (!device)
 		return -EBUSY;
 
-	ret = dce_flow_create(device, &session->flow);
+	ret = dce_flow_create(*vfio_fd, device, &session->flow);
 	if (ret)
 		return -EBUSY;
 	/* No need to configure the flow context record, because the first frame

@@ -9,21 +9,43 @@
 #include <linux/vfio.h>
 #include <sys/mman.h>
 
+#include <sys/eventfd.h>
+#include <sys/epoll.h>
+
 #include "vfio_utils.h"
+#include "dpaa2_io_portal_priv.h"
 
-int vfio_fd, vfio_group_fd;
-static int vfio_group_id;
+#define VFIO_DMA_MAP_FLAG_MMIO (1 << 2)               /* non-cachable device region */
 
-int vfio_setup(const char *dprc)
+#define VFIO_DEVICE_FLAGS_FSL_MC (1 << 4)        /* vfio Freescale MC device */
+
+#define IRQ_SET_BUF_LEN  (sizeof(struct vfio_irq_set) + sizeof(int))
+
+int dpio_epoll_fd;
+
+void vfio_destroy(int *vfio_fd, int *vfio_group_fd)
+{
+	if(*vfio_group_fd){
+		close(*vfio_group_fd);
+		*vfio_group_fd=0;
+	}
+	if(*vfio_fd){
+		close(*vfio_fd);
+		*vfio_fd=0;
+	}
+}
+
+int vfio_setup(const char *dprc, int *vfio_fd, int *vfio_group_fd)
 {
 	char dprc_path[100];
 	char vfio_group_path[100];
 	ssize_t linksize=0;
+	int vfio_group_id;
 	struct vfio_group_status group_status =
 		{ .argsz = sizeof(group_status) };
 
-	vfio_fd = open("/dev/vfio/vfio", O_RDWR);
-	if (vfio_fd < 0) {
+	*vfio_fd = open("/dev/vfio/vfio", O_RDWR);
+	if (*vfio_fd < 0) {
 		perror("VFIO open failed: ");
 		return -1;
 	}
@@ -39,13 +61,13 @@ int vfio_setup(const char *dprc)
 	vfio_group_id = atoi(basename(vfio_group_path));
 	printf("VFIO group ID is %d\n", vfio_group_id);
 	sprintf(vfio_group_path, "/dev/vfio/%d", vfio_group_id);
-	vfio_group_fd = open(vfio_group_path, O_RDWR);
+	*vfio_group_fd = open(vfio_group_path, O_RDWR);
 	if (vfio_group_id < 0) {
 		perror("VFIO group open failed: ");
 		return -1;
 	}
 
-	ioctl(vfio_group_fd, VFIO_GROUP_GET_STATUS, &group_status);
+	ioctl(*vfio_group_fd, VFIO_GROUP_GET_STATUS, &group_status);
 	if (!(group_status.flags & VFIO_GROUP_FLAGS_VIABLE)) {
 		printf("Group status not viable\n");
 		return -1;
@@ -53,13 +75,13 @@ int vfio_setup(const char *dprc)
 
 
 	/* Add the group to the container */
-        if(ioctl(vfio_group_fd, VFIO_GROUP_SET_CONTAINER, &vfio_fd)) {
+        if(ioctl(*vfio_group_fd, VFIO_GROUP_SET_CONTAINER, vfio_fd)) {
 		perror("VFIO_GROUP_SET_CONTAINER failed : ");
 		return -1;
 	}
 
 	/* Enable the IOMMU model we want */
-	if (ioctl(vfio_fd, VFIO_SET_IOMMU, VFIO_TYPE1_IOMMU)) {
+	if (ioctl(*vfio_fd, VFIO_SET_IOMMU, VFIO_TYPE1_IOMMU)) {
 		perror("VFIO_SET_IOMMU failed : ");
 		return -1;
 	}
@@ -68,7 +90,7 @@ int vfio_setup(const char *dprc)
 	return 0;
 }
 
-void* vfio_setup_dma(uint64_t dma_size)
+void* vfio_setup_dma(int vfio_fd, uint64_t dma_size)
 {
 	struct vfio_iommu_type1_dma_map dma_map = { .argsz = sizeof(dma_map) };
 	int ret;
@@ -93,7 +115,7 @@ void* vfio_setup_dma(uint64_t dma_size)
 }
 
 #define PORTAL_SIZE  4096
-void *vfio_map_portal_mem(const char *deviceid, int mem_type)
+void *vfio_map_portal_mem(const char *deviceid, int mem_type, int vfio_fd, int vfio_group_fd)
 {
 	void *vaddr;
 	int device;
@@ -120,12 +142,12 @@ void *vfio_map_portal_mem(const char *deviceid, int mem_type)
 	if (mem_type == PORTAL_MEM_CENA) {
 		// Stashing work around
 		// TOOO: check version - not needed on rev 2
-		vfio_dma_map_area((uint64_t) vaddr, reg.offset, reg.size);
+		vfio_dma_map_area((uint64_t) vaddr, reg.offset, reg.size, vfio_fd);
 	}
 	return vaddr;
 }
 
-int vfio_dma_map_area(uint64_t vaddr, uint64_t offset, ssize_t size)
+int vfio_dma_map_area(uint64_t vaddr, uint64_t offset, ssize_t size, int vfio_fd)
 {
 	struct vfio_iommu_type1_dma_map dma_map = {
 		.argsz = sizeof(dma_map),
@@ -193,5 +215,266 @@ int vfio_destroy_container(const char *dprc)
 	if (system(bind_cmd))
 		return -1;
 	return 0;
+}
+
+struct vfio_iommu_type1_dma_map map = {
+        .argsz = sizeof(map),
+        .flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE | VFIO_DMA_MAP_FLAG_MMIO,
+        .vaddr = 0x6030000,
+        .iova = 0x6030000,
+        .size = 0x1000,
+};
+
+struct vfio_iommu_type1_dma_unmap unmap = {
+        .argsz = sizeof(unmap),
+        .flags = 0,
+        .iova = 0x6030000,
+        .size = 0x1000,
+};
+
+int vfio_disable_regions(int vfio_fd, int device_fd, int* ird_evend_fd)
+{
+        struct vfio_device_info dev_info = { .argsz = sizeof(dev_info) };
+        struct vfio_region_info reg_info = { .argsz = sizeof(reg_info) };
+        struct vfio_irq_info irq_info = { .argsz = sizeof(irq_info) };
+        struct vfio_irq_set *irq_set;
+        char irq_set_buf[IRQ_SET_BUF_LEN];
+        int ret;
+        unsigned int i;
+        int *fd_ptr;
+
+        irq_info.index = 0;
+        if(ioctl(device_fd, VFIO_DEVICE_GET_IRQ_INFO, &irq_info))
+                return -1;
+
+        ret = munmap((void *)0x6030000, 0x1000);
+        if (ret != 0)
+                return -1;
+
+        ret = ioctl(vfio_fd, VFIO_IOMMU_UNMAP_DMA, &unmap);
+        if (ret != 0)
+                return ret;
+
+        for (i = 0; i < dev_info.num_regions; i++) {
+                size_t size;
+
+                reg_info.index = i;
+                if(ioctl(device_fd, VFIO_DEVICE_GET_REGION_INFO, &reg_info))
+                        return -1;
+                size = reg_info.size;
+                if (reg_info.size < 0x1000)
+                        size = 0x1000;
+
+                ret = munmap((void *)reg_info.offset, size);
+                if(ret != 0)
+                        return -1;
+        }
+
+        /* Disable interrupt */
+        irq_set = (struct vfio_irq_set *)irq_set_buf;
+        irq_set->argsz = sizeof(irq_set_buf);
+        irq_set->count = 0;
+        irq_set->flags = VFIO_IRQ_SET_DATA_NONE | VFIO_IRQ_SET_ACTION_TRIGGER;
+        irq_set->index = VFIO_DPIO_DATA_IRQ_INDEX;
+        irq_set->start = 0;
+        fd_ptr = (int *)&irq_set->data;
+        *fd_ptr = *ird_evend_fd;
+        if(ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set)<0)
+                return -1;
+
+        return 0;
+}
+
+int vfio_enable_regions(int vfio_fd, int device_fd, int* ird_evend_fd)
+{
+        struct vfio_device_info dev_info = { .argsz = sizeof(dev_info) };
+        struct vfio_region_info reg_info = { .argsz = sizeof(reg_info) };
+        struct vfio_irq_info irq_info = { .argsz = sizeof(irq_info) };
+        struct vfio_irq_set *irq_set;
+        char irq_set_buf[IRQ_SET_BUF_LEN];
+        int ret;
+        unsigned int i;
+        int *fd_ptr;
+        unsigned long *vaddr = NULL;
+
+        vaddr = (unsigned long *) mmap(NULL, 0x1000, PROT_WRITE | PROT_READ, MAP_SHARED, device_fd, 0x6030000);
+        if (vaddr == MAP_FAILED)
+                return -1;
+
+        map.vaddr = (unsigned long)vaddr;
+        ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &map);
+
+        /* retry */
+        if (errno == EBUSY) {
+                ret = ioctl(vfio_fd, VFIO_IOMMU_UNMAP_DMA, &unmap);
+                if (ret)
+                        printf("Error in vfio_dma_unmap\n");
+
+                ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &map);
+        }
+        if (ret != 0)
+                return ret;
+
+        if (errno)
+                return errno;
+
+        if(ioctl(device_fd, VFIO_DEVICE_GET_INFO, &dev_info))
+                return -1;
+        if(!(dev_info.flags & VFIO_DEVICE_FLAGS_FSL_MC))
+                return -1;
+
+        for (i = 0; i < dev_info.num_regions; i++) {
+                unsigned long *map = NULL;
+                size_t size;
+
+                reg_info.index = i;
+                if(ioctl(device_fd, VFIO_DEVICE_GET_REGION_INFO, &reg_info))
+                        return -1;
+                size = reg_info.size;
+                if (reg_info.size < 0x1000)
+                        size = 0x1000;
+
+                map = (unsigned long *) mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, device_fd, reg_info.offset);
+                if(map == MAP_FAILED)
+                        return -1;
+        }
+
+        /* Set irqs */
+        irq_info.index = 0;
+        if(ioctl(device_fd, VFIO_DEVICE_GET_IRQ_INFO, &irq_info))
+                return -1;
+
+        /* Now set up IRQ : we know count is always one */
+        *ird_evend_fd = eventfd(0, 0);
+        if (*ird_evend_fd < 0) {
+                printf("Error creating eventfd() %d\n", *ird_evend_fd);
+                return -1;
+        }
+
+        /* Register interrupt */
+        irq_set = (struct vfio_irq_set *)irq_set_buf;
+        irq_set->argsz = sizeof(irq_set_buf);
+        irq_set->count = irq_info.count;
+        irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
+        irq_set->index = VFIO_DPIO_DATA_IRQ_INDEX;
+        irq_set->start = 0;
+        fd_ptr = (int *)&irq_set->data;
+        *fd_ptr = *ird_evend_fd;
+        if(ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set)<0)
+                return -1;
+
+        return 0;
+}
+
+int vfio_disable_dpio_interrupt(struct qbman_swp *swp, int vfio_group_fd, int vfio_fd, int *ird_evend_fd, pthread_t *intr_thread)
+{
+        struct vfio_group_status status = { .argsz = sizeof(status) };
+        char deviceName[PATH_MAX];
+        int device_fd;
+        void *res;
+
+        /* Status */
+        if(vfio_group_fd < 0)
+                return -1;
+        if(ioctl(vfio_group_fd, VFIO_GROUP_GET_STATUS, &status))
+                return -1;
+        if(!(status.flags & VFIO_GROUP_FLAGS_VIABLE))
+                return -1;
+        if(!ioctl(vfio_fd, VFIO_GET_API_VERSION) == VFIO_API_VERSION)
+                return -1;
+
+        /* Set Device information */
+        device_fd = ioctl(vfio_group_fd, VFIO_GROUP_GET_DEVICE_FD, deviceName);
+        if(device_fd < 0)
+                return -1;
+        if(vfio_disable_regions(vfio_fd, device_fd, ird_evend_fd))
+                return -1;
+        if(!ioctl(device_fd, VFIO_DEVICE_RESET))
+                return -1;
+
+        /* Delete epoll */
+        struct epoll_event epoll_ev;
+        epoll_ev.events = EPOLLIN | EPOLLPRI | EPOLLET;
+        epoll_ev.data.fd = *ird_evend_fd;
+        if(epoll_ctl(dpio_epoll_fd, EPOLL_CTL_DEL, *ird_evend_fd, &epoll_ev) < 0)
+                return -1;
+
+        /* Disable interrupts */
+        qbman_swp_interrupt_set_inhibit(swp, QBMAN_SWP_INTERRUPT_DQRI);
+
+        /* Cancel the interrupt thread */
+        if(pthread_cancel(*intr_thread))
+                return -1;
+
+        if(pthread_join(*intr_thread, &res) != 0)
+                return -1;
+
+        if (res != PTHREAD_CANCELED) {
+                printf("PTHREAD_CANCEL fail\n");
+                return -1;
+        }
+
+        return 0;
+}
+
+int vfio_enable_dpio_interrupt(struct qbman_swp *swp, int dpio_id, int vfio_group_fd, int vfio_fd, int *ird_evend_fd, pthread_t *intr_thread, void *(*handle_dpio_interrupts) (void *))
+{
+        struct vfio_group_status status = { .argsz = sizeof(status) };
+        char pathIommu[PATH_MAX];
+        char deviceName[PATH_MAX];
+        char *groupName;
+        int groupid, len, device_fd;
+        char iommuGroupPath[PATH_MAX];
+
+        /* Get deviceName and groupid */
+        snprintf(deviceName, sizeof(deviceName),"dpio.%i", dpio_id);
+        snprintf(pathIommu, sizeof(pathIommu), "/sys/bus/fsl-mc/devices/%s/iommu_group", deviceName);
+        len = readlink(pathIommu, iommuGroupPath, PATH_MAX);
+        if(len == -1)
+                return -1;
+        iommuGroupPath[len] = 0;
+        groupName = basename(iommuGroupPath);
+        if(sscanf(groupName, "%d", &groupid) != 1)
+                return -1;
+        if(groupid < 0)
+                return -1;
+
+        /* Status */
+        if(vfio_group_fd < 0)
+                return -1;
+        if(ioctl(vfio_group_fd, VFIO_GROUP_GET_STATUS, &status))
+                return -1;
+        if(!(status.flags & VFIO_GROUP_FLAGS_VIABLE))
+                return -1;
+        if(!ioctl(vfio_fd, VFIO_GET_API_VERSION) == VFIO_API_VERSION)
+                return -1;
+
+        /* Set Device information */
+        device_fd = ioctl(vfio_group_fd, VFIO_GROUP_GET_DEVICE_FD, deviceName);
+        if(device_fd < 0)
+                return -1;
+        if(vfio_enable_regions(vfio_fd, device_fd, ird_evend_fd))
+                return -1;
+        if(!ioctl(device_fd, VFIO_DEVICE_RESET))
+                return -1;
+
+        /* Setup epoll */
+        dpio_epoll_fd = epoll_create(1);
+        struct epoll_event epoll_ev;
+        epoll_ev.events = EPOLLIN | EPOLLPRI | EPOLLET;
+        epoll_ev.data.fd = *ird_evend_fd;
+        if(epoll_ctl(dpio_epoll_fd, EPOLL_CTL_ADD, *ird_evend_fd, &epoll_ev) < 0)
+                return -1;
+
+        /* Enable interrupts */
+        qbman_swp_interrupt_set_trigger(swp, QBMAN_SWP_INTERRUPT_DQRI);
+        qbman_swp_interrupt_clear_status(swp, 0xffffffff);
+        qbman_swp_interrupt_set_inhibit(swp, 0);
+
+        /* Create the interrupt thread */
+        if(pthread_create(intr_thread, NULL, handle_dpio_interrupts, NULL))
+                return -1;
+
+        return 0;
 }
 
