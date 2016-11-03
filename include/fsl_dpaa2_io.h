@@ -121,9 +121,9 @@ struct dpaa2_io_desc {
 	u32 qman_version;
 };
 
-int dpaa2_io_get_dpio(int *rcId, int *dpioId);
+void dpaa2_io_destroy(const int vfio_fd, const int vfio_group_fd);
 
-struct dpaa2_io *dpaa2_io_create(const int dpio_id);
+struct dpaa2_io *dpaa2_io_create(const int dpio_id, const int vfio_fd, const int vfio_group_fd, const unsigned int qbman_version);
 
 void dpaa2_io_down(struct dpaa2_io *d);
 
@@ -365,7 +365,7 @@ static inline const struct dpaa2_fd *dpaa2_dq_fd(const struct dpaa2_dq *dq)
  * clearing/rewriting of those memory locations between uses.
  */
 
-struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
+struct dpaa2_io_store *dpaa2_io_store_create(int vfio_fd, unsigned int max_frames,
 					     struct device *dev);
 
 void dpaa2_io_store_destroy(struct dpaa2_io_store *s);
@@ -378,5 +378,7 @@ int dpaa2_io_query_fq_count(struct dpaa2_io *d, u32 fqid,
 
 int dpaa2_io_query_bp_count(struct dpaa2_io *d, u32 bpid,
 			    u32 *num);
+
+void *handle_dpio_interrupts(void *not_used);
 
 #endif /* __FSL_DPAA2_IO_H */

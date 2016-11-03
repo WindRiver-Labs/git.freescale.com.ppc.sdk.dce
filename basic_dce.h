@@ -35,7 +35,7 @@
 /* 1000 MB default pool size available for dce_alloc. change this macro to
  * desired size if 200MB is not suitable. Must be a 0x1000 aligned size */
 #define DCE_VFIO_CACHE_SZ 0x3E800000
-dma_addr_t dce_alloc(size_t sz);
+dma_addr_t dce_alloc(int *vfio_fd, int *vfio_group_fd, size_t sz);
 void dce_free(dma_addr_t p);
 
 /**

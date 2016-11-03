@@ -104,6 +104,8 @@ static void dce_callback(struct dce_session *session,
 }
 
 static struct dma_mem *dce_mem;
+int exit_vfio_fd;
+int exit_vfio_group_fd;
 
 static void cleanup_dce(void)
 {
@@ -124,10 +126,10 @@ static void cleanup_dce(void)
 	vfio_cleanup_dma(dce_mem->addr);
 	free(dce_mem);
 
-	dpdcei_drv_cleanup();
+	dpdcei_drv_cleanup(exit_vfio_fd, exit_vfio_group_fd);
 }
 
-static int setup_dce(void)
+static int setup_dce(int *vfio_fd, int *vfio_group_fd)
 {
 	struct dce_session_params params = {
 		.engine = DCE_COMPRESSION,
@@ -147,12 +149,12 @@ static int setup_dce(void)
 	if (atomic_read(&users) > 0)
 		return 0; /* No need to do anything, someone else did setup */
 
-	ret = dce_session_create(&comp_session, &params);
+	ret = dce_session_create(vfio_fd, vfio_group_fd, &comp_session, &params);
 	if (ret)
 		return ret;
 
 	params.engine = DCE_DECOMPRESSION;
-	ret = dce_session_create(&decomp_session, &params);
+	ret = dce_session_create(vfio_fd, vfio_group_fd, &decomp_session, &params);
 	if (ret)
 		goto err_decomp_session_create;
 
@@ -161,7 +163,7 @@ static int setup_dce(void)
 		ret = -ENOMEM;
 		goto err_dce_mem_alloc;
 	}
-	dce_mem->addr = vfio_setup_dma(DCE_VFIO_CACHE_SZ);
+	dce_mem->addr = vfio_setup_dma(*vfio_fd, DCE_VFIO_CACHE_SZ);
 	if (!dce_mem->addr) {
 		ret = -ENOMEM;
 		goto err_dce_mem_dma;
@@ -169,6 +171,8 @@ static int setup_dce(void)
 	dce_mem->sz = DCE_VFIO_CACHE_SZ;
 	dma_mem_allocator_init(dce_mem);
 
+	exit_vfio_fd = *vfio_fd;
+	exit_vfio_group_fd = *vfio_group_fd;
 	ret = atexit(cleanup_dce);
 	if (ret)
 		goto err_dce_cleanup;
@@ -255,13 +259,13 @@ err_enqueue:
 	return ret;
 }
 
-dma_addr_t dce_alloc(size_t sz)
+dma_addr_t dce_alloc(int *vfio_fd, int *vfio_group_fd, size_t sz)
 {
 	int ret;
 
 	if (dce < 0) {
 		/* no one initialized the dce yet. Attempt initialize */
-		ret = setup_dce();
+		ret = setup_dce(vfio_fd, vfio_group_fd);
 		if (ret < 0) {
 			/* maybe a different pthread already opened it. Take a
 			 * pause and check again */

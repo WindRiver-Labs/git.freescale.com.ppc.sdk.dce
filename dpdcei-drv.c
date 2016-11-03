@@ -41,6 +41,7 @@
 #include <fsl_dpdcei.h>
 #include <fsl_dpdcei_cmd.h>
 #include <fsl_qbman_base.h>
+#include <fsl_dpaa2_io.h>
 #include <vfio_utils.h>
 #include <qbman_portal.h>
 #include "dpdcei-drv.h"
@@ -104,25 +105,25 @@ static void clear_flow_table_entry(struct dce_flow *flow, u32 entry)
 static struct dpdcei_priv *compression;
 static struct dpdcei_priv *decompression;
 
-static int __cold dpdcei_drv_setup(void);
+static int __cold dpdcei_drv_setup(int *vfio_fd, int *dpdcei_drv_setup);
 
-struct dpdcei_priv *get_compression_device(void)
+struct dpdcei_priv *get_compression_device(int *vfio_fd, int *vfio_group_fd)
 {
 	if (!compression)
-		dpdcei_drv_setup();
+		dpdcei_drv_setup(vfio_fd, vfio_group_fd);
 	return compression;
 }
 EXPORT_SYMBOL(get_compression_device);
 
-struct dpdcei_priv *get_decompression_device(void)
+struct dpdcei_priv *get_decompression_device(int *vfio_fd, int *vfio_group_fd)
 {
 	if (!decompression)
-		dpdcei_drv_setup();
+		dpdcei_drv_setup(vfio_fd, vfio_group_fd);
 	return decompression;
 }
 EXPORT_SYMBOL(get_decompression_device);
 
-int dce_flow_create(struct dpdcei_priv *device, struct dce_flow *flow)
+int dce_flow_create(int vfio_fd, struct dpdcei_priv *device, struct dce_flow *flow)
 {
 	int err;
 
@@ -135,7 +136,7 @@ int dce_flow_create(struct dpdcei_priv *device, struct dce_flow *flow)
 	flow->device = device;
 
 	/* Setup dma memory for the flow */
-	flow->mem.addr = vfio_setup_dma(MAX_RESOURCE_IN_FLIGHT);
+	flow->mem.addr = vfio_setup_dma(vfio_fd, MAX_RESOURCE_IN_FLIGHT);
 	if (!flow->mem.addr) {
 		err = -ENOMEM;
 		goto err_dma_mem_setup;
@@ -378,9 +379,9 @@ static int __cold dpdcei_unbind_dpio(struct dpdcei_priv *priv,
 	return 0;
 }
 
-static int dpaa2_dce_alloc_store(struct dpdcei_priv *priv)
+static int dpaa2_dce_alloc_store(int vfio_fd, struct dpdcei_priv *priv)
 {
-	priv->rx_store = dpaa2_io_store_create(DQ_STORE_SIZE, NULL);
+	priv->rx_store = dpaa2_io_store_create(vfio_fd, DQ_STORE_SIZE, NULL);
 	if (!priv->rx_store) {
 		pr_err("dpaa2_io_store_create() failed\n");
 		return -ENOMEM;
@@ -399,13 +400,14 @@ static void dpaa2_dce_free_store(struct dpdcei_priv *priv)
 #define DPRC_GET_ICID_FROM_POOL         (uint16_t)(~(0))
 #define DPRC_GET_PORTAL_ID_FROM_POOL    (int)(~(0))
 
-static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id);
+static void appease_mc(struct fsl_mc_io *mc_io, int *vfio_fd, int *vfio_group_fd, int dprc_id, int dpio_id);
 
 static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io,
 						struct dpaa2_io *dpio_p,
 						int dprc_id,
 						uint16_t root_dprc_token,
 						int dpio_id,
+						int vfio_fd,
 						int engine)
 {
 	struct dprc_res_req res_req;
@@ -512,7 +514,7 @@ static __cold struct dpdcei_priv *dpdcei_setup(struct fsl_mc_io *mc_io,
 	priv->tx_fqid = tx_attr.fqid;
 
 	/* dpio store */
-	err = dpaa2_dce_alloc_store(priv);
+	err = dpaa2_dce_alloc_store(vfio_fd, priv);
 	if (err)
 		goto err_get_attr;
 
@@ -557,13 +559,82 @@ err_priv_alloc:
 	return NULL;
 }
 
+/* DPIO creation move to application */
+#define FIRST_DPIO_STASH 4
+static int dpaa2_io_get_dpio(int *rc_id, int *dpio_id, unsigned int *qbman_version)
+{
+        struct dprc_res_req res_req;
+        int root_container_id=1;
+        uint16_t token_dprc[2];
+        struct dprc_cfg cfg_dprc;
+        char id_str_dprc[20];
+        int created_dprc_id;
+        uint64_t child_portal_paddr;
+
+        struct fsl_mc_io mc_io;
+        uint16_t token_dpio;
+        struct dpio_cfg cfg_dpio;
+        char id_str_dpio[20];
+        struct dpio_attr attr_dpio;
+
+        /* MC */
+        if(mc_io_init(&mc_io))
+                return -1;
+        if(dprc_open(&mc_io,0, root_container_id, &token_dprc[0]))
+                return -1;
+
+        /* RC */
+        cfg_dprc.icid = DPRC_GET_ICID_FROM_POOL;
+        cfg_dprc.portal_id = DPRC_GET_PORTAL_ID_FROM_POOL;
+        cfg_dprc.options = DPRC_CFG_OPT_TOPOLOGY_CHANGES_ALLOWED;
+        strncpy(cfg_dprc.label, "dprc", 16);
+        if(dprc_create_container(&mc_io,0, token_dprc[0], &cfg_dprc, &created_dprc_id, &child_portal_paddr))
+                return -1;
+        sprintf(id_str_dprc, "dprc.%i", created_dprc_id);
+        printf("Created DPRC: %x\n", created_dprc_id);
+
+        if(dprc_open(&mc_io,0, created_dprc_id, &token_dprc[1]))
+                return -1;
+        vfio_force_rescan();
+
+        /* DPIO */
+        cfg_dpio.channel_mode =1; cfg_dpio.num_priorities =8;
+        if(dpio_create(&mc_io,0, &cfg_dpio, &token_dpio))
+                return -1;
+        vfio_force_rescan();
+        if(dpio_get_attributes(&mc_io,0, token_dpio, &attr_dpio))
+                return -1;
+        if(dpio_close(&mc_io,0, token_dpio))
+                return -1;
+        vfio_force_rescan();
+        strcpy(res_req.type, "dpio"); res_req.num =1; res_req.options =DPRC_RES_REQ_OPT_EXPLICIT | DPRC_RES_REQ_OPT_PLUGGED;
+
+        res_req.id_base_align =attr_dpio.id;
+        if(dprc_assign(&mc_io,0, token_dprc[0], created_dprc_id, &res_req))
+                return -1;
+        vfio_force_rescan();
+        if(dpio_open(&mc_io,0, attr_dpio.id, &token_dpio))
+                return -1;
+        if(dpio_set_stashing_destination(&mc_io,0, token_dpio, FIRST_DPIO_STASH))
+                return -1;
+        sprintf(id_str_dpio, "dpio.%i", attr_dpio.id);
+        printf("Created: %s\n", id_str_dpio);
+
+        *dpio_id = attr_dpio.id;
+        *rc_id = created_dprc_id;
+        *qbman_version = attr_dpio.qbman_version;
+
+        return 0;
+}
+
+
 static DEFINE_SPINLOCK(driver_lock);
 
 static void reaper(int piper[2]);
 
 #define NUM_RESOURCES 4
 
-static int __cold dpdcei_drv_setup(void)
+static int __cold dpdcei_drv_setup(int *vfio_fd, int *vfio_group_fd)
 {
 	struct fsl_mc_io *mc_io;
 	struct dpaa2_io *dpio_p;
@@ -571,6 +642,7 @@ static int __cold dpdcei_drv_setup(void)
 	uint16_t root_dprc_token;
 	int piper[2];
 	int buff[NUM_RESOURCES];
+	unsigned int qbman_version;
 	int err = 0;
 
 	spin_lock(&driver_lock);
@@ -609,21 +681,21 @@ static int __cold dpdcei_drv_setup(void)
 	if (err)
 		goto err_mc_io_init;
 
-	err = dpaa2_io_get_dpio(&dprc_id, &dpio_id);
+	err = dpaa2_io_get_dpio(&dprc_id, &dpio_id, &qbman_version);
 	if (err)
 		goto err_mc_io_init;
 
-	appease_mc(mc_io, dprc_id, dpio_id);
+	appease_mc(mc_io, vfio_fd, vfio_group_fd, dprc_id, dpio_id);
 
 	/* Get dpio */
-	dpio_p = dpaa2_io_create(dpio_id);
+	dpio_p = dpaa2_io_create(dpio_id, *vfio_fd, *vfio_group_fd, qbman_version);
 
 	err = dprc_open(mc_io, MC_CMD_FLAG_PRI, ROOT_DPRC, &root_dprc_token);
 	if (err)
 		pr_err("dprc_open() failed to open the root container\n");
 
 	compression = dpdcei_setup(mc_io, dpio_p, dprc_id, root_dprc_token,
-					dpio_id, DPDCEI_ENGINE_COMPRESSION);
+					dpio_id, *vfio_fd, DPDCEI_ENGINE_COMPRESSION);
 	if (!compression) {
 		pr_err("Failed to setup compression dpdcei\n");
 		err = -EACCES;
@@ -631,7 +703,7 @@ static int __cold dpdcei_drv_setup(void)
 	}
 
 	decompression = dpdcei_setup(mc_io, dpio_p, dprc_id, root_dprc_token,
-					dpio_id, DPDCEI_ENGINE_DECOMPRESSION);
+					dpio_id, *vfio_fd, DPDCEI_ENGINE_DECOMPRESSION);
 	if (!decompression) {
 		pr_err("Failed to setup decompression dpdcei\n");
 		err = -EACCES;
@@ -661,7 +733,7 @@ err_mc_io_alloc:
 
 static struct qbman_swp *dpio_swp;
 
-static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
+static void appease_mc(struct fsl_mc_io *mc_io, int *vfio_fd, int *vfio_group_fd, int dprc_id, int dpio_id)
 {
 	char dpio_id_str[50];
 	char dprc_id_str[50];
@@ -683,7 +755,7 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
 		pr_err("vfio_bind_container() failed\n");
 		abort();
 	}
-	err = vfio_setup(dprc_id_str);
+	err = vfio_setup(dprc_id_str, vfio_fd, vfio_group_fd);
 	if (err) {
 		pr_err("vfio_setup\n");
 		abort();
@@ -695,7 +767,7 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
 	assert(!dpio_enable(mc_io, 0, dpio_token));
 
 	desc_swp.cena_bar = 0;
-	desc_swp.cinh_bar = vfio_map_portal_mem(dpio_id_str, PORTAL_MEM_CINH);
+	desc_swp.cinh_bar = vfio_map_portal_mem(dpio_id_str, PORTAL_MEM_CINH, *vfio_fd, *vfio_group_fd);
 	assert(desc_swp.cinh_bar);
 
 	desc_swp.idx = dpio_id;
@@ -706,12 +778,11 @@ static void appease_mc(struct fsl_mc_io *mc_io, int dprc_id, int dpio_id)
 	qbman_swp_finish(dpio_swp);
 }
 
-void dpdcei_drv_cleanup(void)
+void dpdcei_drv_cleanup(int vfio_fd, int vfio_group_fd)
 {
 	int err;
 	struct fsl_mc_io *mc_io;
 	uint16_t temp_token;
-	extern int vfio_fd, vfio_group_fd;
 
 	spin_lock(&driver_lock);
 	if (!compression || !decompression) {
@@ -719,6 +790,8 @@ void dpdcei_drv_cleanup(void)
 		return;
 	}
 	assert(compression && decompression);
+
+	dpaa2_io_destroy(vfio_fd, vfio_group_fd);
 
 	mc_io = malloc(sizeof(struct fsl_mc_io));
 	if (!mc_io) {

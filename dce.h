@@ -327,7 +327,7 @@ struct dce_session {
  *
  * Return:	0 on success, error otherwise
  */
-int dce_session_create(struct dce_session *session,
+int dce_session_create(int *vfio_fd, int *vfio_group_fd, struct dce_session *session,
 		       struct dce_session_params *params);
 
 /** dce_session_device - gets the (de)compression device used in the session

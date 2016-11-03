@@ -54,8 +54,6 @@
 #include <inttypes.h>
 #include <error.h>
 
-#include <vfio_utils.h>
-
 /* The following definitions are primarily to allow the single-source driver
  * interfaces to be included by arbitrary program code. Ie. for interfaces that
  * are also available in kernel-space, these definitions provide compatibility
@@ -241,8 +239,12 @@ do { \
 	*__p = be32toh(*__p); \
 })
 
+#ifndef lower_32_bits
 #define lower_32_bits(x) ((u32)(x))
+#endif
+#ifndef upper_32_bits
 #define upper_32_bits(x) ((u32)(((x) >> 16) >> 16))
+#endif
 
 /* Compiler/type stuff */
 typedef unsigned int	gfp_t;
@@ -621,7 +623,7 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 #define atomic_sub_and_test(i, v) (atomic_sub_return(i, v) == 0)
 
 /* Place holder until a real vfio setup is established */
-#define vfio_alloc(s, a) vfio_setup_dma(s < 0xA000 ? 0xA000 : \
+#define vfio_alloc(s, a, fd) vfio_setup_dma(fd, s < 0xA000 ? 0xA000 : \
 					s & 0xFFFFFFFFFFFFF000)
 #define vfio_free(x)
 

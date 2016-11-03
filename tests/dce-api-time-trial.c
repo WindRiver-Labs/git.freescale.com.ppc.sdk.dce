@@ -99,7 +99,7 @@ static void global_cb(struct dce_session *session,
 	wake_up(&replies_wait);
 }
 
-static __init int dce_api_time_trial_init(void)
+static __init int dce_api_time_trial_init(int *vfio_fd)
 {
 	int err, i;
 	unsigned long timeout, eq_time = 0, start_time, end_time, speed, j_1,
@@ -128,7 +128,7 @@ static __init int dce_api_time_trial_init(void)
 	params.compression_effort = level;
 	params.callback_frame = global_cb; /* setup callback */
 
-	err = dce_session_create(&session, &params);
+	err = dce_session_create(vfio_fd, &session, &params);
 	if (err) {
 		pr_err("can't get dce session\n");
 		return err;
@@ -281,7 +281,7 @@ static __init int dce_api_time_trial_init(void)
 	/* Setup a decompression session */
 	params.engine = DCE_DECOMPRESSION;
 	/* will keep the rest of the parameters as the were from compression */
-	err = dce_session_create(&session, &params);
+	err = dce_session_create(vfio_fd, &session, &params);
 	if (err)
 		return err;
 

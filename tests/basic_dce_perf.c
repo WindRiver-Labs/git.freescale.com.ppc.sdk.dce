@@ -81,6 +81,7 @@ static void *worker_func(void *__context)
 	size_t output_sz, output_produced;
 	dma_addr_t output;
 	struct chunk *chunk;
+	int vfio_fd, vfio_group_fd;
 	int ret;
 
 	snprintf(thread_name, sizeof(thread_name), "%d", context->idx);
@@ -89,7 +90,7 @@ static void *worker_func(void *__context)
 
 	output_sz = context->mode == DCE_COMPRESSION ? chunk_size * 2 :
 							chunk_size * 15;
-	output = dce_alloc(output_sz);
+	output = dce_alloc(&vfio_fd, &vfio_group_fd, output_sz);
 	if (!output) {
 		pr_err("Unable to allocate dma memory for DCE\n");
 		exit(EXIT_FAILURE);
@@ -171,6 +172,7 @@ int main(int argc, char *argv[])
 	struct work_context *contexts;
 	int ret, i;
 	char *endptr;
+	int vfio_fd, vfio_group_fd;
 
 	/* process command line args */
 	while (NEXT_ARG()) {
@@ -235,7 +237,7 @@ int main(int argc, char *argv[])
 		while ((bytes_in = fread(buf, 1, chunk_size, input_file)) > 0) {
 			struct chunk *new_chunk = malloc(sizeof(struct chunk));
 
-			new_chunk->addr = dce_alloc(bytes_in);
+			new_chunk->addr = dce_alloc(&vfio_fd, &vfio_group_fd, bytes_in);
 			if (!new_chunk->addr) {
 				pr_err("Unable to allocate dma memory for DCE\n");
 				exit(EXIT_FAILURE);
@@ -260,7 +262,7 @@ int main(int argc, char *argv[])
 			new_chunk->size = (i + 1 == (signed)num_chunks) ?
 				dce_test_data_size - (i * chunk_size) :
 				chunk_size;
-			new_chunk->addr = dce_alloc(new_chunk->size);
+			new_chunk->addr = dce_alloc(&vfio_fd, &vfio_group_fd, new_chunk->size);
 			if (!new_chunk->addr) {
 				pr_err("Unable to allocate dma memory for DCE\n");
 				exit(EXIT_FAILURE);

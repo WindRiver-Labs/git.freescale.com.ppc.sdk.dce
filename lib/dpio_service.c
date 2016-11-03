@@ -55,7 +55,6 @@
 
 #include "fsl_qbman_portal.h"
 #include "fsl_dpaa2_io.h"
-#include "fsl_dpio.h"
 #include "fsl_qbman_base.h"
 #include "qbman_debug.h"
 #include "compat.h"
@@ -64,28 +63,18 @@
 #include <sys/epoll.h>
 
 #define PTR_ALIGN(p, a)            ((typeof(p))ALIGN((unsigned long)(p), (a)))
-#define FIRST_DPIO_STASH 4
-#define VFIO_DMA_MAP_FLAG_MMIO (1 << 2)               /* non-cachable device region */
 
-#define NR_CPUS 8
+#define NR_CPUS 32
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
-
-#define IRQ_SET_BUF_LEN  (sizeof(struct vfio_irq_set) + sizeof(int))
-
-#define VFIO_DEVICE_FLAGS_FSL_MC (1 << 4)        /* vfio Freescale MC device */
-
-//extern struct dpaa2_io *devObjPtr;
-
-struct dpaa2_io *obj;
 
 struct dpaa2_io_store {
 	unsigned int max;
 	dma_addr_t paddr;
 	struct qbman_result *vaddr;
-	void *alloced_addr; /* unaligned value from kmalloc() */
-	unsigned int idx; /* position of the next-to-be-returned entry */
+	void *alloced_addr;    /* unaligned value from kmalloc() */
+	unsigned int idx;      /* position of the next-to-be-returned entry */
 	struct qbman_swp *swp; /* portal used to issue VDQCR */
-	struct device *dev; /* device used for DMA mapping */
+	struct device *dev;    /* device used for DMA mapping */
 };
 
 /* keep a per cpu array of DPIOs for fast access */
@@ -93,100 +82,43 @@ static struct dpaa2_io *dpio_by_cpu[NR_CPUS];
 static struct list_head dpio_list = LIST_HEAD_INIT(dpio_list);
 static DEFINE_SPINLOCK(dpio_list_lock) ;
 
-extern int vfio_fd;
-extern int vfio_group_fd;
-static int efd;
-static int dpio_epollfd;
+/* Interrupt process related data */
+static pthread_t intr_thread;
+static int ird_evend_fd;
+extern int dpio_epoll_fd;
+static struct dpaa2_io *dpaa2_io_obj;
 
 /**********************/
 /* Internal functions */
 /**********************/
 
-static int vfio_init_regions(int vfio_fd, int deviceFd, int* efd)
+void *handle_dpio_interrupts(void *not_used)
 {
-        struct vfio_device_info dev_info = { .argsz = sizeof(dev_info) };
-        struct vfio_region_info reg_info = { .argsz = sizeof(reg_info) };
-        struct vfio_irq_info irq_info = { .argsz = sizeof(irq_info) };
-        struct vfio_irq_set *irq_set;
-        char irq_set_buf[IRQ_SET_BUF_LEN];
-        int ret;
-	unsigned int i;
-        int *fd_ptr;
-        unsigned long *vaddr = NULL;
-        struct vfio_iommu_type1_dma_map map = {
-                .argsz = sizeof(map),
-                .flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE | VFIO_DMA_MAP_FLAG_MMIO,
-                .vaddr = 0x6030000,
-                .iova = 0x6030000,
-                .size = 0x1000,
-        };
+	(void)not_used; /* Silence compiler warning. */
+	int nfds;
+	struct epoll_event events[10];
 
-        struct vfio_iommu_type1_dma_unmap unmap = {
-                .argsz = sizeof(unmap),
-                .flags = 0,
-                .iova = 0x6030000,
-                .size = 0x1000,
-        };
-
-        vaddr = (unsigned long *) mmap(NULL, 0x1000, PROT_WRITE | PROT_READ, MAP_SHARED, deviceFd, 0x6030000);
-        assert (vaddr != MAP_FAILED);
-
-        map.vaddr = (unsigned long)vaddr;
-        ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &map);
-
-	/* retry */
-        if (errno == EBUSY) {
-                ret = ioctl(vfio_fd, VFIO_IOMMU_UNMAP_DMA, &unmap);
-                if (ret)
-                        printf("Error in vfio_dma_unmap\n");
-
-                ret = ioctl(vfio_fd, VFIO_IOMMU_MAP_DMA, &map);
-        } 
-	if (ret != 0) 
-        	return ret;
-
-	if (errno) 
-        	return errno;
-
-        assert(!ioctl(deviceFd, VFIO_DEVICE_GET_INFO, &dev_info));
-        assert (dev_info.flags & VFIO_DEVICE_FLAGS_FSL_MC);
-
-        for (i = 0; i < dev_info.num_regions; i++) {
-                unsigned long *map = NULL;
-                size_t size;
-
-                reg_info.index = i;
-                assert(!ioctl(deviceFd, VFIO_DEVICE_GET_REGION_INFO, &reg_info));
-                size = reg_info.size;
-                if (reg_info.size < 0x1000)
-                        size = 0x1000;
-
-                map = (unsigned long *) mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, deviceFd, reg_info.offset);
-                assert (map != MAP_FAILED);
-        }
-        /* Set irqs */
-        irq_info.index = 0;
-        assert(!ioctl(deviceFd, VFIO_DEVICE_GET_IRQ_INFO, &irq_info));
-
-        /* Now set up IRQ : we know count is always one */
-        *efd = eventfd(0, 0);
-        if (*efd < 0) {
-		printf("Error creating eventfd() %d\n", *efd);
-		return -1;
-        }
-
-	/* Register interrupt */
-        irq_set = (struct vfio_irq_set *)irq_set_buf;
-        irq_set->argsz = sizeof(irq_set_buf);
-        irq_set->count = irq_info.count;
-        irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
-        irq_set->index = VFIO_DPIO_DATA_IRQ_INDEX;
-        irq_set->start = 0;
-        fd_ptr = (int *)&irq_set->data;
-        *fd_ptr = *efd;
-        assert(ioctl(deviceFd, VFIO_DEVICE_SET_IRQS, irq_set)>=0);
-
-	return 0;
+	
+	for(;;) {
+	        nfds = epoll_wait(dpio_epoll_fd, events, 1, -1);
+		/* epoll_wait fail */
+		if (nfds < 0) {
+			if (errno == EINTR){
+				/* System call interrupt, not an error */
+				continue;
+			}
+	                pr_err("epoll_wait returns with fail %i\n", nfds);
+			continue;
+		}
+		/* epoll_wait timeout, will never happens here */
+		else if (nfds == 0) {
+				pr_err("Timeout\n");
+				continue;
+		}
+		/* epoll_wait has at least one fd ready to read */
+		dpaa2_io_irq(dpaa2_io_obj);
+	}
+	return NULL;
 }
 
 static inline struct dpaa2_io *service_select_by_cpu(struct dpaa2_io *d,
@@ -218,153 +150,34 @@ static inline struct dpaa2_io *service_select(struct dpaa2_io *d)
 	return d;
 }
 
-static void *handle_interrupts(void *not_used)
-{
-        (void)not_used; /* Silence compiler warning. */
-        int nfds;
-        struct epoll_event events[10];
-
-	
-        for(;;) {
-                nfds = epoll_wait(dpio_epollfd, events, 1, -1);
-		/* epoll_wait fail */
-		if (nfds < 0) {
-			if (errno == EINTR){
-				/* System call interrupt, not an error */
-				continue;
-			}
-                        pr_err("epoll_wait returns with fail %i\n", nfds);
-			continue;
-		}
-		/* epoll_wait timeout, will never happens here */
-		else if (nfds == 0) {
-				pr_err("Timeout\n");
-				continue;
-		}
-		/* epoll_wait has at least one fd ready to read */
-		dpaa2_io_irq(obj);
-	}
-	return NULL;
-}
-
-static int init_interrupt(struct qbman_swp *swp, int dpio_id)
-{
-        struct vfio_group_status status = { .argsz = sizeof(status) };
-        char pathIommu[PATH_MAX];
-        char deviceName[PATH_MAX];
-        char iommuGroupPath[PATH_MAX], *groupName;
-        int groupid, len, deviceFd;
-
-	/* Get deviceName and groupid */
-	snprintf(deviceName, sizeof(deviceName),"dpio.%i", dpio_id);
-        snprintf(pathIommu, sizeof(pathIommu), "/sys/bus/fsl-mc/devices/%s/iommu_group", deviceName);
-        len = readlink(pathIommu, iommuGroupPath, PATH_MAX);
-        assert (len != -1);
-        iommuGroupPath[len] = 0;
-        groupName = basename(iommuGroupPath);
-        assert (sscanf(groupName, "%d", &groupid) == 1);
-        assert (groupid >= 0);
-
-	/* Status */
-        assert (vfio_group_fd >= 0);
-        assert (!ioctl(vfio_group_fd, VFIO_GROUP_GET_STATUS, &status));
-        assert (status.flags & VFIO_GROUP_FLAGS_VIABLE);
-        assert(ioctl(vfio_fd, VFIO_GET_API_VERSION) == VFIO_API_VERSION);
-
-        /* Set Device information */
-        deviceFd = ioctl(vfio_group_fd, VFIO_GROUP_GET_DEVICE_FD, deviceName);
-        assert (deviceFd >= 0);
-        assert(!vfio_init_regions(vfio_fd, deviceFd, &efd));
-	assert(ioctl(deviceFd, VFIO_DEVICE_RESET));
-
-	/* Setup epoll */	
-	dpio_epollfd = epoll_create(1);
-	struct epoll_event epoll_ev;
-	epoll_ev.events = EPOLLIN | EPOLLPRI | EPOLLET;
-	epoll_ev.data.fd = efd;
-	assert(epoll_ctl(dpio_epollfd, EPOLL_CTL_ADD, efd, &epoll_ev) >= 0);
-
-	/* Enable interrupts */
-        qbman_swp_interrupt_set_trigger(swp, QBMAN_SWP_INTERRUPT_DQRI);
-        qbman_swp_interrupt_clear_status(swp, 0xffffffff);
-        qbman_swp_interrupt_set_inhibit(swp, 0);
-
-	/* Create the interrupt thread */
-	static pthread_t intr_thread;
-	assert(!pthread_create(&intr_thread, NULL, handle_interrupts, NULL));
-
-	return 0;
-}
-
 /**********************/
 /* Exported functions */
 /**********************/
 
-static struct dprc_res_req res_req;
-static int root_container_id=1;
-static uint16_t token_dprc[2];
-static struct dprc_cfg cfg_dprc;
-char id_str_dprc[20];
-int created_dprc_id;
-static uint64_t child_portal_paddr;
-
-
-static struct fsl_mc_io mc_io;
-static uint16_t token_dpio;
-static struct dpio_cfg cfg_dpio;
-static struct dpio_attr attr_dpio;
-static char id_str_dpio[20];
-
-int dpaa2_io_get_dpio(int *rcId, int *dpioId)
+/**
+ * dpaa2_io_destroy() - destroy a dpaa2_io object.
+ *
+ * Disable the interrupt and reclame the resource related to the dpaa2 io object.
+ *
+ * No return value.
+ */
+void dpaa2_io_destroy(const int vfio_fd, const int vfio_group_fd) 
 {
-	/* MC */
-	if(mc_io_init(&mc_io))
-		return -1;
-        if(dprc_open(&mc_io,0, root_container_id, &token_dprc[0]))
-		return -1;
+	int32_t cpu = sched_getcpu();
+	spin_lock(&dpio_list_lock);
+	list_add_tail(&dpaa2_io_obj->node, &dpio_list);
+	if (cpu != -1 && !dpio_by_cpu[cpu])
+		dpio_by_cpu[cpu] = 0;
+	spin_unlock(&dpio_list_lock);
 
-        /* RC */
-        cfg_dprc.icid = DPRC_GET_ICID_FROM_POOL;
-        cfg_dprc.portal_id = DPRC_GET_PORTAL_ID_FROM_POOL;
-        cfg_dprc.options = DPRC_CFG_OPT_TOPOLOGY_CHANGES_ALLOWED;
-        strncpy(cfg_dprc.label, "dprc", 16);
-        if(dprc_create_container(&mc_io,0, token_dprc[0], &cfg_dprc, &created_dprc_id, &child_portal_paddr))
-		return -1;
-        sprintf(id_str_dprc, "dprc.%i", created_dprc_id);
-        printf("Created DPRC: %x\n", created_dprc_id);
-
-        if(dprc_open(&mc_io,0, created_dprc_id, &token_dprc[1]))
-		return -1;
-        vfio_force_rescan();
-
-	/* DPIO */
-        cfg_dpio.channel_mode =1; cfg_dpio.num_priorities =8;
-        if(dpio_create(&mc_io,0, &cfg_dpio, &token_dpio))
-		return -1;
-        vfio_force_rescan();
-        if(dpio_get_attributes(&mc_io,0, token_dpio, &attr_dpio))
-		return -1;
-        if(dpio_close(&mc_io,0, token_dpio))
-		return -1;
-        vfio_force_rescan();
-        strcpy(res_req.type, "dpio"); res_req.num =1; res_req.options =DPRC_RES_REQ_OPT_EXPLICIT | DPRC_RES_REQ_OPT_PLUGGED;
-
-        res_req.id_base_align =attr_dpio.id;
-        if(dprc_assign(&mc_io,0, token_dprc[0], created_dprc_id, &res_req))
-		return -1;
-        vfio_force_rescan();
-        if(dpio_open(&mc_io,0, attr_dpio.id, &token_dpio))
-		return -1;
-        if(dpio_set_stashing_destination(&mc_io,0, token_dpio, FIRST_DPIO_STASH))
-		return -1;
-        sprintf(id_str_dpio, "dpio.%i", attr_dpio.id);
-        printf("Created: %s\n", id_str_dpio);
-
-	*dpioId = attr_dpio.id;
-	*rcId = created_dprc_id;
-
-	return 0;
+	if(dpaa2_io_obj->swp){
+		vfio_disable_dpio_interrupt(dpaa2_io_obj->swp, vfio_group_fd, vfio_fd, &ird_evend_fd, &intr_thread);
+		qbman_swp_finish(dpaa2_io_obj->swp);
+	}
+	if(dpaa2_io_obj)
+		kfree(dpaa2_io_obj);
 }
+EXPORT_SYMBOL(dpaa2_io_destroy);
 
 /**
  * dpaa2_io_create() - create a dpaa2_io object.
@@ -377,55 +190,59 @@ int dpaa2_io_get_dpio(int *rcId, int *dpioId)
  *
  * Return a valid dpaa2_io object for success, or NULL for failure.
  */
-struct dpaa2_io *dpaa2_io_create(const int dpio_id)
+struct dpaa2_io *dpaa2_io_create(const int dpio_id, const int vfio_fd, const int vfio_group_fd, const unsigned int qbman_version)
 {
-	if (!obj)
-		obj = kmalloc(sizeof(*obj), GFP_KERNEL);
-	if (!obj)
+	char id_str_dpio[20];
+	sprintf(id_str_dpio, "dpio.%i", dpio_id);
+
+	if (!dpaa2_io_obj)
+		dpaa2_io_obj = kmalloc(sizeof(*dpaa2_io_obj), GFP_KERNEL);
+	if (!dpaa2_io_obj)
 		return NULL;
 
-	atomic_set(&obj->refs, 1);
-	obj->swp_desc.cena_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CENA);
-	if(!obj->swp_desc.cena_bar)
+	atomic_set(&dpaa2_io_obj->refs, 1);
+	dpaa2_io_obj->swp_desc.cena_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CENA, vfio_fd, vfio_group_fd);
+	if(!dpaa2_io_obj->swp_desc.cena_bar)
 		return NULL;
-	obj->swp_desc.cinh_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CINH);
-	if(!obj->swp_desc.cinh_bar)
+	dpaa2_io_obj->swp_desc.cinh_bar = vfio_map_portal_mem(id_str_dpio, PORTAL_MEM_CINH, vfio_fd, vfio_group_fd);
+	if(!dpaa2_io_obj->swp_desc.cinh_bar)
 		return NULL;
-	obj->swp_desc.idx = attr_dpio.id;
-	obj->swp_desc.eqcr_mode = qman_eqcr_vb_array;
-	obj->swp_desc.irq = -1;
-	obj->swp_desc.qman_version = attr_dpio.qbman_version;
-	obj->swp = qbman_swp_init(&(obj->swp_desc));
+	dpaa2_io_obj->swp_desc.idx = dpio_id;
+	dpaa2_io_obj->swp_desc.eqcr_mode = qman_eqcr_vb_array;
+	dpaa2_io_obj->swp_desc.irq = -1;
+	dpaa2_io_obj->swp_desc.qman_version = qbman_version;
+	dpaa2_io_obj->swp = qbman_swp_init(&(dpaa2_io_obj->swp_desc));
 
-	if (!obj->swp) {
-		kfree(obj);
+	if (!dpaa2_io_obj->swp) {
+		kfree(dpaa2_io_obj);
 		return NULL;
 	}
-	obj->dpio_desc.dpio_id=dpio_id;
+	dpaa2_io_obj->dpio_desc.dpio_id=dpio_id;
 
-	INIT_LIST_HEAD(&obj->node);
-	spin_lock_init(&obj->lock_mgmt_cmd);
-	spin_lock_init(&obj->lock_notifications);
-	INIT_LIST_HEAD(&obj->notifications);
+	INIT_LIST_HEAD(&dpaa2_io_obj->node);
+	spin_lock_init(&dpaa2_io_obj->lock_mgmt_cmd);
+	spin_lock_init(&dpaa2_io_obj->lock_notifications);
+	INIT_LIST_HEAD(&dpaa2_io_obj->notifications);
 
-	qbman_swp_interrupt_clear_status(obj->swp, 0xffffffff);
-	if (obj->dpio_desc.receives_notifications)
-		qbman_swp_push_set(obj->swp, 0, 1);
+	qbman_swp_interrupt_clear_status(dpaa2_io_obj->swp, 0xffffffff);
+	if (dpaa2_io_obj->dpio_desc.receives_notifications)
+		qbman_swp_push_set(dpaa2_io_obj->swp, 0, 1);
 
 	int32_t cpu = sched_getcpu();
 	spin_lock(&dpio_list_lock);
-	list_add_tail(&obj->node, &dpio_list);
+	list_add_tail(&dpaa2_io_obj->node, &dpio_list);
 	if (cpu != -1 && !dpio_by_cpu[cpu])
-		dpio_by_cpu[cpu] = obj;
+		dpio_by_cpu[cpu] = dpaa2_io_obj;
 	spin_unlock(&dpio_list_lock);
 
-	if(init_interrupt(obj->swp, dpio_id)) {
-		printf("fail init_interrupt\n");
-		kfree(obj);
+	if(vfio_enable_dpio_interrupt(dpaa2_io_obj->swp, dpio_id, vfio_group_fd, vfio_fd, &ird_evend_fd, &intr_thread, handle_dpio_interrupts)) {
+		printf("fail vfio_enable_dpio_interrupt\n");
+		vfio_disable_dpio_interrupt(dpaa2_io_obj->swp, vfio_group_fd, vfio_fd, &ird_evend_fd, &intr_thread);
+		kfree(dpaa2_io_obj);
 		return NULL;
 	}
 
-	return obj;
+	return dpaa2_io_obj;
 }
 EXPORT_SYMBOL(dpaa2_io_create);
 
@@ -873,7 +690,7 @@ EXPORT_SYMBOL(dpaa2_io_service_acquire);
  * Return dpaa2_io_store struct for successfuly created storage memory, or NULL
  * if not getting the stroage for dequeue result in create API.
  */
-struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
+struct dpaa2_io_store *dpaa2_io_store_create(int vfio_fd, unsigned int max_frames,
 					     struct device *dev)
 {
 	struct dpaa2_io_store *ret;
@@ -885,7 +702,7 @@ struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
 	ret->max = max_frames;
 	size = max_frames * sizeof(struct dpaa2_dq);
 
-	ret->vaddr = vfio_setup_dma(size);
+	ret->vaddr = vfio_setup_dma(vfio_fd, size);
 	ret->paddr = (u64)ret->vaddr;
 
 	ret->idx = 0;
@@ -905,11 +722,10 @@ void dpaa2_io_store_destroy(struct dpaa2_io_store *s)
 {
 	(void)s; /* Silence compiler warning. Will be used in future */
 /*	destroy vfio_setup_dma not implemented
-	dma_unmap_single(s->dev, s->paddr, sizeof(struct dpaa2_dq) * s->max,
-			 DMA_FROM_DEVICE);
+	dma_unmap_single(s->dev, s->paddr, sizeof(struct dpaa2_dq) * s->max, DMA_FROM_DEVICE);
+*/
 	kfree(s->alloced_addr);
 	kfree(s);
-*/
 }
 EXPORT_SYMBOL(dpaa2_io_store_destroy);
 
@@ -974,8 +790,8 @@ int dpaa2_io_query_fq_count(struct dpaa2_io *d, u32 fqid, u32 *fcnt, u32 *bcnt)
 	pthread_mutex_unlock(&d->lock_mgmt_cmd);
 	if (ret)
 		return ret;
-        *fcnt = qbman_fq_state_frame_count(&state);
-        *bcnt = qbman_fq_state_byte_count(&state);
+	*fcnt = qbman_fq_state_frame_count(&state);
+	*bcnt = qbman_fq_state_byte_count(&state);
 
 	return 0;
 }
