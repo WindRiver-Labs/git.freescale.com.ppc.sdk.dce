@@ -253,10 +253,6 @@ int dce_session_create(int *vfio_fd, int *vfio_group_fd, struct dce_session *ses
 	 * will carry an SCR with the correct configuration and DCE will update
 	 * the FCR to match */
 
-	ret = alloc_dce_internals(session);
-	if (ret)
-		goto fail_dce_internals;
-
 	/* FIXME: Must handle gz_header if it is present here */
 	session->flow.cb = internal_callback;
 	session->engine = params->engine;
@@ -269,6 +265,10 @@ int dce_session_create(int *vfio_fd, int *vfio_group_fd, struct dce_session *ses
 	session->encode_base_64 = params->encode_base_64;
 	session->callback_frame = params->callback_frame;
 	session->callback_data = params->callback_data;
+
+	ret = alloc_dce_internals(session);
+	if (ret)
+		goto fail_dce_internals;
 
 	/* Handle gzip header */
 	if (session->compression_format == DCE_SESSION_CF_GZIP) {
