@@ -250,7 +250,7 @@ void scf_c_cfg_set_history_ptr(struct scf_c_cfg *d, uint64_t addr)
 	 */
 	u32 *cl = dce_cl(d);
 
-	dce_attr_code_encode(&code_pending_output_ptr_lo, cl,
+	dce_attr_code_encode(&code_history_ptr_lo, cl,
 			lower32(addr) >> 6);
 	dce_attr_code_encode(&code_history_ptr_hi, cl, upper32(addr));
 }
