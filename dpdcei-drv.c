@@ -165,13 +165,13 @@ int dce_flow_create(int vfio_fd, struct dpdcei_priv *device, struct dce_flow *fl
 err_get_table_entry:
 	dma_mem_free(&flow->mem, flow->flc.virt);
 err_fcr_alloc:
-	vfio_cleanup_dma(flow->mem.addr);
+	vfio_cleanup_dma(vfio_fd, flow->mem.addr, flow->mem.sz);
 err_dma_mem_setup:
 	return err;
 }
 EXPORT_SYMBOL(dce_flow_create);
 
-int dce_flow_destroy(struct dce_flow *flow)
+int dce_flow_destroy(int vfio_fd, struct dce_flow *flow)
 {
 	flow->flc.phys = 0;
 	flow->flc.len = 0;
@@ -179,7 +179,7 @@ int dce_flow_destroy(struct dce_flow *flow)
 	clear_flow_table_entry(flow, flow->key);
 	dma_mem_free(&flow->mem, flow->flc.virt);
 	flow->flc.virt = NULL;
-	vfio_cleanup_dma(flow->mem.addr);
+	vfio_cleanup_dma(vfio_fd, flow->mem.addr, flow->mem.sz);
 	flow->mem.addr = NULL;
 	return 0;
 }

@@ -350,7 +350,7 @@ struct dpdcei_priv *dce_session_device(struct dce_session *session);
  *
  * Return:	0 on success, -EACCES if there is still work in progress
  */
-int dce_session_destroy(struct dce_session *session);
+int dce_session_destroy(int *vfio_fd,struct dce_session *session);
 
 
 /**

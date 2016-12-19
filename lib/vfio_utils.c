@@ -114,6 +114,31 @@ void* vfio_setup_dma(int vfio_fd, uint64_t dma_size)
 	return (void*) dma_map.vaddr;
 }
 
+int vfio_cleanup_dma(int vfio_fd, void *vaddr, uint64_t dma_size)
+{
+	struct vfio_iommu_type1_dma_unmap dma_map = { .argsz = sizeof(dma_map) };
+	int ret;
+
+	/* Unmap mempry from software address space (mmu) */
+	ret = munmap(vaddr, dma_size);
+	if (ret) {
+		perror("DMA munmap() failed");
+		return errno;
+	}
+
+	dma_map.size = dma_size;
+	dma_map.iova = (unsigned long)vaddr;
+	dma_map.flags = 0;
+
+	/* Remove corresponding hardware accelerator mapping (smmu) */
+	ret = ioctl(vfio_fd, VFIO_IOMMU_UNMAP_DMA, &dma_map);
+	if (ret) {
+		perror("DMA unmap ioctl failed");
+		return errno;
+	}
+	return 0;
+}
+
 #define PORTAL_SIZE  4096
 void *vfio_map_portal_mem(const char *deviceid, int mem_type, int vfio_fd, int vfio_group_fd)
 {
