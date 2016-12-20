@@ -278,18 +278,18 @@ int dce_session_create(int *vfio_fd, int *vfio_group_fd, struct dce_session *ses
 	return 0;
 
 fail_dce_internals:
-	dce_flow_destroy(&session->flow);
+	dce_flow_destroy(*vfio_fd, &session->flow);
 	return ret;
 }
 EXPORT_SYMBOL(dce_session_create);
 
-int dce_session_destroy(struct dce_session *session)
+int dce_session_destroy(int *vfio_fd, struct dce_session *session)
 {
 	/* Attempt to destroy the session while frames in flight */
 	if (atomic_read(&session->flow.frames_in_flight))
 		return -EACCES;
 	free_dce_internals(session);
-	dce_flow_destroy(&session->flow);
+	dce_flow_destroy(*vfio_fd, &session->flow);
 	return 0;
 }
 EXPORT_SYMBOL(dce_session_destroy);

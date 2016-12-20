@@ -99,7 +99,7 @@ struct dce_flow {
  * where the caller does not need to specify a specific map */
 #define MAX_RESOURCE_IN_FLIGHT ((320 * 50000) & ~0xFFF)
 int dce_flow_create(int vfio_fd, struct dpdcei_priv *dev, struct dce_flow *flow);
-int dce_flow_destroy(struct dce_flow *flow);
+int dce_flow_destroy(int vfio_fd, struct dce_flow *flow);
 
 int enqueue_fd(struct dce_flow *flow, struct dpaa2_fd *fd);
 int enqueue_nop(struct dce_flow *flow);

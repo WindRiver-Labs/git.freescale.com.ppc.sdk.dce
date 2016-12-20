@@ -273,7 +273,7 @@ static __init int dce_api_time_trial_init(int *vfio_fd)
 		pr_info("Received all frames\n");
 	}
 
-	dce_session_destroy(&session);
+	dce_session_destroy(vfio_fd, &session);
 
 	/*********************************************************************/
 	/* Now decompress the compressed data */
@@ -425,7 +425,7 @@ static __init int dce_api_time_trial_init(int *vfio_fd)
 		pr_info("Original input matches decompressed data\n");
 
 err_timedout:
-	err = dce_session_destroy(&session);
+	err = dce_session_destroy(vfio_fd, &session);
 	if (err)
 		pr_info("Error destroy session %d\n", err);
 	dma_unmap_single(&session.device->dev, output.paddr, output.size,
