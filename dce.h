@@ -127,13 +127,13 @@ enum dce_compression_effort {
 
 /**
  * enum dce_flush_parameter - Data flushing modes
- * @DCE_Z_NO_FLUSH:	equivalent to Z_NO_FLUSH
+ * @DCE_Z_NO_FLUSH:		equivalent to Z_NO_FLUSH
  * @DCE_Z_PARTIAL_FLUSH:	equivalent to Z_PARTIAL_FLUSH
- * @DCE_Z_SYNC_FLUSH:	equivalent to Z_PARTIAL_FLUSH
- * @DCE_Z_FULL_FLUSH:	equivalent to Z_SYNC_FLUSH
- * @DCE_Z_FINISH:	equivalent to Z_FULL_FLUSH
- * @DCE_Z_BLOCK:	equivalent to Z_BLOCK
- * @DCE_Z_TREES:	equivalent to Z_TREES
+ * @DCE_Z_SYNC_FLUSH:		equivalent to Z_SYNC_FLUSH
+ * @DCE_Z_FULL_FLUSH:		equivalent to Z_FULL_FLUSH
+ * @DCE_Z_FINISH:		equivalent to Z_FINISH
+ * @DCE_Z_BLOCK:		equivalent to Z_BLOCK
+ * @DCE_Z_TREES:		equivalent to Z_TREES
  *
  * These flush parameters are parallel to the zlib standard
  */
