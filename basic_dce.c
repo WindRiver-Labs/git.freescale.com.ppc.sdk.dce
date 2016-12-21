@@ -107,7 +107,7 @@ static struct dma_mem *dce_mem;
 int exit_vfio_fd;
 int exit_vfio_group_fd;
 
-static void cleanup_dce(int *vfio_fd)
+static void cleanup_dce(void)
 {
 	int ret;
 
@@ -116,14 +116,14 @@ static void cleanup_dce(int *vfio_fd)
 	if (!atomic_dec_and_test(&users))
 		return;
 
-	ret = dce_session_destroy(*vfio_fd, &comp_session);
+	ret = dce_session_destroy(&exit_vfio_fd, &comp_session);
 	if (ret)
 		pr_err("Failed to close DCE compress session. ret = %d", ret);
-	ret = dce_session_destroy(*vfio_fd, &decomp_session);
+	ret = dce_session_destroy(&exit_vfio_fd, &decomp_session);
 	if (ret)
 		pr_err("Failed to close DCE decompress session. ret = %d", ret);
 
-	vfio_cleanup_dma(*vfio_fd, dce_mem->addr, dce_mem->sz);
+	vfio_cleanup_dma(exit_vfio_fd, dce_mem->addr, dce_mem->sz);
 	free(dce_mem);
 
 	dpdcei_drv_cleanup(exit_vfio_fd, exit_vfio_group_fd);
@@ -186,9 +186,9 @@ err_dce_cleanup:
 err_dce_mem_dma:
 	free(dce_mem);
 err_dce_mem_alloc:
-	dce_session_destroy(*vfio_fd, &decomp_session);
+	dce_session_destroy(vfio_fd, &decomp_session);
 err_decomp_session_create:
-	dce_session_destroy(*vfio_fd, &comp_session);
+	dce_session_destroy(vfio_fd, &comp_session);
 	return ret;
 }
 
